@@ -192,6 +192,11 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .menu-list .btn{justify-content:flex-start;padding:0 16px}
 .btn.danger{color:#ffb4a5}
 .sheet .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
+.sheet.won h2{color:var(--gold);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
+.sheet.won.game h2{font-size:36px}
+.sheet.won .kicker{font-family:var(--f-idx);font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--lacquer);margin:0 0 2px;animation:pop .5s .05s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -227,6 +232,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   </div>
 </div>
 <div id="layer"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
 
 <script>
 (()=>{
@@ -343,7 +349,12 @@ const SND=(()=>{
     pass:t=>tone(300,t,.14,'sine',.06,220),
     turn:t=>{tone(660,t,.16,'sine',.07);tone(990,t+.09,.2,'sine',.06)},
     trick:t=>[523,659,784].forEach((f,i)=>tone(f,t+i*.07,.2,'triangle',.07)),
-    win:t=>[523,659,784,1047].forEach((f,i)=>tone(f,t+i*.11,.34,'triangle',.09)),
+    win:t=>{[523,659,784,1047].forEach((f,i)=>tone(f,t+i*.09,.3,'triangle',.09));
+      [1047,1319,1568].forEach(f=>tone(f,t+.38,.7,'triangle',.06));
+      for(let i=0;i<6;i++)tone(2093+i*190,t+.45+i*.05,.12,'sine',.025)},
+    bigwin:t=>{const m=[[523,0],[659,.12],[784,.24],[1047,.36],[784,.52],[1047,.64]];m.forEach(([f,d])=>tone(f,t+d,.22,'triangle',.09));
+      [523,659,784,1047,1319].forEach(f=>tone(f,t+.82,1.3,'triangle',.05));
+      for(let i=0;i<10;i++)tone(1800+Math.random()*1600,t+.9+i*.07,.1,'sine',.025)},
     lose:t=>[392,330,262].forEach((f,i)=>tone(f,t+i*.14,.32,'triangle',.07)),
   };
   return{
@@ -419,7 +430,9 @@ function endHand(w){
   S.result={w,delta,left:S.hands.map(h=>h.slice())};
   if(Math.max(...S.scores)>=GAME_TO) S.gameOver={winners:gameWinners()};
   save();render();
-  setTimeout(()=>{if(S.over){const g=S.gameOver;SND.play((g?g.winners.includes(0):w===0)?'win':'lose');showResult()}},700);
+  const g=S.gameOver,iWon=g?g.winners.includes(0):w===0;
+  if(iWon){celebrate(!!g);SND.play(g?'bigwin':'win')}
+  setTimeout(()=>{if(S.over){if(!iWon)SND.play('lose');showResult()}},iWon?900:700);
 }
 let botTimer=null;
 function botDelay(){const p=S.turn;if(S.top&&!allPlays(S.hands[p]).some(legal))return 320;return S.top?560:680}
@@ -617,9 +630,49 @@ function playable(){const k=S.hands[0].join()+'|'+(S.top?S.top.co.cards.join():'
 let hc={k:'',v:true};
 function hintCache(){const k=S.hands[0].join()+'|'+(S.top?S.top.co.cards.join():'');if(hc.k!==k){hc={k,v:hintList().length>0}}return hc.v}
 
+/* ---------- celebration: confetti and suit pips burst from your hand ---------- */
+let fxParts=[],fxRAF=0;
+function celebrate(big){
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const cv=$('fx'),dpr=Math.min(window.devicePixelRatio||1,3);
+  cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;
+  const COL=['#e8b964','#f4d58d','#d4472f','#fbf8f1','#c4302b','#7fd1b9'],GL=['♦','♣','♥','♠'];
+  const burst=(x,y,n,spread,power)=>{for(let i=0;i<n;i++){
+    const a=-Math.PI/2+(Math.random()-.5)*spread,v=power*(.55+Math.random()*.6),glyph=Math.random()<.22;
+    fxParts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,r:Math.random()*6.3,vr:(Math.random()-.5)*.35,
+      w:glyph?0:5+Math.random()*6,h:glyph?0:3+Math.random()*4,g:glyph?GL[i%4]:null,sz:14+Math.random()*12,
+      c:COL[(Math.random()*COL.length)|0],life:0,max:big?150+Math.random()*80:100+Math.random()*50})}};
+  const W=innerWidth,H=innerHeight,hy=H*.8;
+  burst(W/2,hy,big?140:90,1.3,big?17:14);
+  if(big){
+    setTimeout(()=>{burst(0,H*.65,70,.9,16);burst(W,H*.65,70,.9,16)},350);
+    setTimeout(()=>burst(W/2,hy,110,1.6,18),800);
+    setTimeout(()=>{for(let i=0;i<5;i++)burst(W*(.1+.2*i),-10,14,2,4)},1300);
+  }
+  // side kick for angle variety
+  fxParts.forEach((p,i)=>{if(p.x===0)p.vx=Math.abs(p.vx)+4;if(p.x===W)p.vx=-Math.abs(p.vx)-4});
+  if(!fxRAF)fxRAF=requestAnimationFrame(fxStep);
+}
+function fxStep(){
+  const cv=$('fx'),ctx=cv.getContext('2d'),dpr=cv.width/innerWidth;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);
+  fxParts=fxParts.filter(p=>p.life<p.max&&p.y<innerHeight+40);
+  for(const p of fxParts){
+    p.life++;p.vy+=.32;p.vx*=.985;p.vy*=.985;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;
+    const a=Math.min(1,(p.max-p.life)/30);ctx.globalAlpha=a;
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;
+    if(p.g){ctx.font=`700 ${p.sz}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=(p.g==='♥'||p.g==='♦')?'#e04a3a':'#fbf8f1';ctx.fillText(p.g,0,0)}
+    else{ctx.scale(1,Math.cos(p.life*.2+p.r));ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h)}
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+  if(fxParts.length)fxRAF=requestAnimationFrame(fxStep);else{fxRAF=0;ctx.clearRect(0,0,innerWidth,innerHeight)}
+}
+
 /* ---------- sheets ---------- */
-function sheet(html,onMount){
-  const L=$('layer');L.innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog">${html}</div></div>`;
+function sheet(html,onMount,cls){
+  const L=$('layer');L.innerHTML=`<div class="scrim" id="scrim"><div class="sheet ${cls||''}" role="dialog">${html}</div></div>`;
   $('scrim').addEventListener('click',e=>{if(e.target.id==='scrim'&&!S.over)closeSheet()});
   onMount&&onMount();
 }
@@ -635,19 +688,21 @@ function showResult(){
   let title,sub,btn;
   if(g){
     const W=g.winners;
-    title=W.length>1?W.map(nm).join(' & ')+' share the win':W[0]===0?'You win the game!':NAMES[W[0]]+' wins the game';
+    title=W.length>1?W.map(nm).slice(0,-1).join(', ')+' & '+nm(W[W.length-1])+' share the win':W[0]===0?'You win the game!':NAMES[W[0]]+' wins the game';
     const over=[0,1,2,3].filter(i=>S.scores[i]>=GAME_TO).map(nm);
-    sub=`${over.join(' & ')} reached ${GAME_TO} after hand ${S.round}, so the game is over. Lowest total wins.`;
+    sub=`${over.length>1?over.slice(0,-1).join(', ')+' & '+over[over.length-1]:over[0]} reached ${GAME_TO} after hand ${S.round}, so the game is over. Lowest total wins.`;
     btn='New game';
   }else{
     title=r.w===0?'You win the hand':NAMES[r.w]+' wins the hand';
     sub=`Hand ${S.round}. Everyone else takes a point per card left (2 each at 10+, 3 each at 13). Game ends when someone reaches ${GAME_TO}; lowest total wins.`;
     btn='Deal next hand';
   }
-  sheet(`<h2>${title}</h2><p class="sub">${sub}</p>
+  const iWon=g?g.winners.includes(0):r.w===0;
+  const kick=iWon?(g?'<p class="kicker">Champion</p>':'<p class="kicker">Out first</p>'):'';
+  sheet(`${kick}<h2>${title}</h2><p class="sub">${sub}</p>
     <table class="res"><tr><td style="color:var(--muted);font-size:12px;border:0">Player</td><td class="n" style="color:var(--muted);font-size:12px;border:0">Hand</td><td class="tot" style="font-size:12px;border:0">Total</td></tr>${rows}</table>
     <button class="btn play" id="nextBtn">${btn}</button>`,()=>{$('nextBtn').onclick=()=>{closeSheet();
-      if(S.gameOver){S=freshState();deal();advance()}else{S.round++;deal();advance()}}});
+      if(S.gameOver){S=freshState();deal();advance()}else{S.round++;deal();advance()}}},iWon?'won'+(g?' game':''):'');
 }
 function showMenu(){
   sheet(`<h2>Big 2</h2><p class="sub">Hand ${S.round} · You have ${S.scores[0]} point${S.scores[0]===1?'':'s'}. First to ${GAME_TO} ends the game; lowest total wins.</p>
@@ -750,7 +805,7 @@ window.claude?.hot?.snapshot?.(snap);
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 
 /* test hooks */
-window.__big2={SND,cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
+window.__big2={celebrate,SND,cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
 })();
 </script>
 
