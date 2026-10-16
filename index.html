@@ -44,11 +44,13 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .icon-btn:active{background:var(--felt-line)}
 
 /* table: north seat, north play, middle row (west seat | west play | east play | east seat), your play */
-.table{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly;align-items:stretch;gap:4px}
+.table{flex:1;min-height:0;position:relative;overflow:hidden;margin-bottom:6px}
+/* .tin holds the table; fitTable() scales it down (CSS zoom) when the screen is too short, so it never spills onto the status line */
+.tin{display:flex;flex-direction:column;justify-content:space-evenly;align-items:stretch;gap:4px}
 .seat{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
-.mid{position:relative;display:grid;grid-template-columns:48px 1fr 1fr 48px;gap:6px;align-items:center;min-height:120px}
+.mid{position:relative;display:grid;grid-template-columns:48px 1fr 1fr 48px;gap:6px;align-items:center;min-height:110px}
 .mid .seat{align-self:start}
-.mid .fan.v{min-height:106px}
+.mid .fan.v{min-height:82px}
 .who{font-size:13px;font-weight:600;line-height:1;white-space:nowrap;padding:5px 9px;border-radius:99px;
   border:1.5px solid transparent;background:rgba(255,255,255,.06);transition:border-color .2s,background .2s}
 .seat.turn .who{border-color:var(--gold);background:rgba(232,185,100,.12);color:var(--gold);animation:pulse 1.2s ease-in-out infinite}
@@ -69,11 +71,11 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .fan.h i{width:22px;height:31px;margin-left:-14px}
 .fan.h i:first-child{margin-left:0}
 .fan.v{flex-direction:column}
-.fan.v i{width:31px;height:22px;margin-top:-15px}
+.fan.v i{width:31px;height:22px;margin-top:-17px}
 .fan.v i:first-child{margin-top:0}
 
 /* play slots: each play stays in front of whoever made it */
-.slot{display:flex;align-items:center;justify-content:center;min-height:82px;min-width:0}
+.slot{display:flex;align-items:center;justify-content:center;min-height:78px;min-width:0}
 .slot.w{justify-content:flex-start}
 .slot.e{justify-content:flex-end}
 .play{display:flex;flex-direction:column;align-items:center;gap:5px;transition:opacity .25s,transform .25s}
@@ -201,7 +203,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       </button>
     </div>
   </div>
-  <div class="table" id="table">
+  <div class="table" id="table"><div class="tin" id="tin">
     <div class="seat n" id="seat2"></div>
     <div class="slot n" id="slot2"></div>
     <div class="mid">
@@ -212,7 +214,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <div class="msg" id="msg"></div>
     </div>
     <div class="south"><div class="slot s" id="slot0"></div><div class="seat s" id="seat0"></div></div>
-  </div>
+  </div></div>
   <div class="status" id="status"></div>
   <div class="hand" id="hand"></div>
   <div class="bar">
@@ -519,6 +521,7 @@ function render(){
   $('status').innerHTML=msg;
   const cb=$('clearBtn');if(cb)cb.onclick=clearSel;
   renderHand(myTurn);
+  fitTable();
   // buttons
   const canBeat=myTurn?hintCache():false;
   $('playBtn').disabled=!ps.ok&&!S.flash;
@@ -543,6 +546,14 @@ function renderHand(myTurn){
   h.classList.toggle('off',!myTurn);
 }
 window.addEventListener('resize',()=>S&&render());
+function fitTable(){
+  const t=$('table'),tin=$('tin');
+  tin.style.zoom='';tin.style.height='auto';
+  const avail=t.clientHeight,need=tin.offsetHeight;
+  if(!avail)return;
+  if(need<=avail){tin.style.height=avail+'px';return}
+  const z=avail/need;tin.style.zoom=z;tin.style.height=need+'px';
+}
 function clearSel(){S.sel=[];S.hint=-1;render()}
 let pc={k:'',v:null};
 function playable(){const k=S.hands[0].join()+'|'+(S.top?S.top.co.cards.join():'')+'|'+S.first;
