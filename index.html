@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d2b27">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
@@ -26,6 +26,7 @@ html{height:100%;box-sizing:border-box}
 body{height:100%;-webkit-touch-callout:none;background:var(--felt);color:var(--ink);font-family:var(--f-ui);margin:0;
   -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
   overscroll-behavior:none;touch-action:manipulation;overflow:hidden}
+*{touch-action:manipulation}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
 button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 #app{height:100%;display:flex;flex-direction:column;box-sizing:border-box;
@@ -58,8 +59,8 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .seat.turn .who .sc{color:inherit;opacity:.8}
 .seat.last .who{background:var(--lacquer);color:var(--lacquer-ink)}
 .seat.last .who .sc{color:inherit;opacity:.85}
-.south{position:relative}
-.seat.s{position:absolute;left:0;bottom:4px;z-index:1}
+.south{display:flex;flex-direction:column;align-items:center;gap:6px}
+.south .slot{align-self:stretch}
 .seat.last.turn .who{border-color:var(--gold)}
 /* opponent hands: the real number of card backs */
 .fan{display:flex}
@@ -130,7 +131,8 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 #app.myturn .status{color:var(--gold);font-weight:600}
 .status .warn{color:var(--gold)}
 .clear{font-size:13px;font-weight:500;color:var(--muted);text-decoration:underline;text-underline-offset:3px;min-height:40px;padding:0 12px;margin:-5px -12px -5px 0;display:inline-flex;align-items:center}
-.hand{position:relative;flex:none;touch-action:none;height:124px;margin:0 -8px}
+.hand,.hand *{touch-action:none}
+.hand{position:relative;flex:none;height:124px;margin:0 -8px}
 .hand::before{content:"";position:absolute;left:10%;right:10%;top:0;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0;transition:opacity .25s}
 #app.myturn .hand::before{opacity:.8}
 .hand .card{position:absolute;left:var(--x);top:var(--y);width:var(--cw);transform-origin:50% 100%;transform:rotate(var(--r));
@@ -209,7 +211,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <div class="seat e" id="seat1"></div>
       <div class="msg" id="msg"></div>
     </div>
-    <div class="south"><div class="seat s" id="seat0"></div><div class="slot s" id="slot0"></div></div>
+    <div class="south"><div class="slot s" id="slot0"></div><div class="seat s" id="seat0"></div></div>
   </div>
   <div class="status" id="status"></div>
   <div class="hand" id="hand"></div>
@@ -634,6 +636,13 @@ hand.addEventListener('pointerup',endDrag);hand.addEventListener('pointercancel'
 $('playBtn').onclick=()=>{if(S.flash){nextTrick();return}const ps=playState();if(ps.ok)doPlay(0,ps.co.cards)};
 $('passBtn').onclick=()=>{if(S.turn===0&&S.top&&!S.over)doPass(0)};
 $('menuBtn').onclick=showMenu;
+/* stop iOS double-tap zoom: the hand swallows native touch gestures (pointer events still fire), and a quick
+   second tap anywhere else that isn't a control is cancelled */
+hand.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+let lastTouch=0;
+document.addEventListener('touchend',e=>{const now=Date.now();
+  if(now-lastTouch<350&&!e.target.closest('button,a,input'))e.preventDefault();lastTouch=now},{passive:false});
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
 document.querySelector('.table').addEventListener('click',()=>{if(S.flash)nextTrick();else if(S.sel.length)clearSel()});
 
 /* ---------- persistence ---------- */
