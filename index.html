@@ -42,6 +42,8 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .top-r{display:flex;align-items:center;gap:6px}
 .icon-btn{width:44px;height:44px;margin-right:-6px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
 .icon-btn:active{background:var(--felt-line)}
+.top-r{gap:0}
+#muteBtn{margin-right:0}
 
 /* table: north seat, north play, middle row (west seat | west play | east play | east seat), your play */
 .table{flex:1;min-height:0;position:relative;overflow:hidden;margin-bottom:6px}
@@ -198,6 +200,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   <div class="top">
     <div class="brand">BIG <b>2</b></div>
     <div class="top-r">
+      <button class="icon-btn" id="muteBtn" aria-label="Mute sounds"></button>
       <button class="icon-btn" id="menuBtn" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><circle cx="4" cy="10" r="1.8"/><circle cx="10" cy="10" r="1.8"/><circle cx="16" cy="10" r="1.8"/></svg>
       </button>
@@ -310,6 +313,46 @@ function allPlays(hand){
 }
 const sum=a=>a.reduce((x,y)=>x+y,0);
 
+/* ---------- sound: synthesized with Web Audio, no files ---------- */
+const SND=(()=>{
+  let ctx=null,muted=false;
+  try{muted=localStorage.getItem('big2-mute')==='1'}catch(_){}
+  function ac(){
+    if(!ctx){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;try{ctx=new A()}catch(_){return null}}
+    if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+    return ctx;
+  }
+  function tone(f,t,dur,type,vol,f2){
+    const o=ctx.createOscillator(),g=ctx.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);
+    if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.008);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(g).connect(ctx.destination);o.start(t);o.stop(t+dur+.03);
+  }
+  let nbuf=null;
+  function snap(t,vol,freq){ // a short filtered noise burst: a card hitting felt
+    if(!nbuf){const n=Math.floor(ctx.sampleRate*.08);nbuf=ctx.createBuffer(1,n,ctx.sampleRate);const d=nbuf.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,4)}
+    const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();
+    s.buffer=nbuf;f.type='bandpass';f.frequency.value=freq;f.Q.value=.9;g.gain.value=vol;
+    s.connect(f).connect(g).connect(ctx.destination);s.start(t);
+  }
+  const P={
+    tap:t=>tone(1500,t,.045,'sine',.05),
+    deny:t=>tone(170,t,.09,'triangle',.07),
+    play:(t,n)=>{for(let i=0;i<n;i++)snap(t+i*.04,.9,2200-i*120)},
+    pass:t=>tone(300,t,.14,'sine',.06,220),
+    turn:t=>{tone(660,t,.16,'sine',.07);tone(990,t+.09,.2,'sine',.06)},
+    trick:t=>[523,659,784].forEach((f,i)=>tone(f,t+i*.07,.2,'triangle',.07)),
+    win:t=>[523,659,784,1047].forEach((f,i)=>tone(f,t+i*.11,.34,'triangle',.09)),
+    lose:t=>[392,330,262].forEach((f,i)=>tone(f,t+i*.14,.32,'triangle',.07)),
+  };
+  return{
+    unlock(){if(!muted)ac()},
+    play(name,arg){if(muted)return;const c=ac();if(!c||c.state!=='running')return;try{P[name](c.currentTime+.01,arg||1)}catch(_){}},
+    get muted(){return muted},
+    toggle(){muted=!muted;try{localStorage.setItem('big2-mute',muted?'1':'0')}catch(_){}if(!muted){ac();setTimeout(()=>SND.play('tap'),30)}return muted},
+  };
+})();
+
 /* ---------- state ---------- */
 let S;
 function freshState(scores){
@@ -335,17 +378,17 @@ function doPlay(p,cards){
   const co=classify(cards);
   S.hands[p]=S.hands[p].filter(c=>!cards.includes(c));
   S.top={co,by:p};S.passes=0;S.first=false;S.acts[p]={play:co.cards};
-  S.anim=p;
+  S.anim=p;SND.play('play',cards.length);
   if(p===0){S.sel=[];S.hint=-1}
   if(!S.hands[p].length){endHand(p);return}
   S.turn=nextP(p);
   advance();
 }
 function doPass(p){
-  S.acts[p]={pass:true};S.passes++;
+  S.acts[p]={pass:true};S.passes++;SND.play('pass');
   if(p===0){S.sel=[];S.hint=-1}
   if(S.passes>=3){
-    clearTimeout(botTimer);
+    clearTimeout(botTimer);setTimeout(()=>SND.play('trick'),180);
     S.turn=-1;S.flash={who:S.top.by};save();render();
     return;
   }
@@ -366,7 +409,7 @@ function endHand(w){
   S.scores=S.scores.map((s,i)=>s+delta[i]);
   S.result={w,delta,left:S.hands.map(h=>h.slice())};
   save();render();
-  setTimeout(()=>{if(S.over)showResult()},700);
+  setTimeout(()=>{if(S.over){SND.play(w===0?'win':'lose');showResult()}},700);
 }
 let botTimer=null;
 function botDelay(){const p=S.turn;if(S.top&&!allPlays(S.hands[p]).some(legal))return 320;return S.top?560:680}
@@ -376,6 +419,7 @@ function advance(){
   save();render();
   if(S.over||S.turn<0) return;
   if(S.turn===0){
+    if(!(S.top&&!hintCache()))SND.play('turn');
     if(S.top&&!hintCache()) botTimer=setTimeout(()=>{if(S.turn===0&&!S.over&&S.top&&!hintCache())doPass(0)},1000);
     return;
   }
@@ -606,7 +650,7 @@ function showRules(){
   <h3>Straights</h3>
   <p>A can be high or low. 10-J-Q-K-A is the top straight, A-2-3-4-5 the lowest. No wrapping (J-Q-K-A-2 isn't a straight).</p>
   <h3>Controls</h3>
-  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, tap Next trick (or the table) to continue</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
+  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, tap Next trick (or the table) to continue</li><li>The speaker button at the top turns sounds on or off. On iPhone, the silent switch also mutes them</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
   <div style="height:12px"></div><button class="btn" id="rBack">Done</button>`,()=>{$('rBack').onclick=closeSheet});
 }
 
@@ -632,7 +676,7 @@ function setSel(c,on){if(on&&blocked(c))return;const i=S.sel.indexOf(c);if(on&&i
 hand.addEventListener('pointerdown',e=>{
   if(S.over)return;const c=cardAt(e.clientX,e.clientY,true);if(c==null)return;
   e.preventDefault();
-  drag={on:!S.sel.includes(c),seen:new Set([c]),last:c};if(drag.on)smartSelect(c);else setSel(c,false);S.hint=-1;
+  drag={on:!S.sel.includes(c),seen:new Set([c]),last:c};if(drag.on&&blocked(c))SND.play('deny');else SND.play('tap');if(drag.on)smartSelect(c);else setSel(c,false);S.hint=-1;
   try{hand.setPointerCapture(e.pointerId)}catch(_){}
 });
 hand.addEventListener('pointermove',e=>{
@@ -647,6 +691,12 @@ hand.addEventListener('pointerup',endDrag);hand.addEventListener('pointercancel'
 $('playBtn').onclick=()=>{if(S.flash){nextTrick();return}const ps=playState();if(ps.ok)doPlay(0,ps.co.cards)};
 $('passBtn').onclick=()=>{if(S.turn===0&&S.top&&!S.over)doPass(0)};
 $('menuBtn').onclick=showMenu;
+const SPK_ON='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+const SPK_OFF='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/><path d="m16 9 6 6M22 9l-6 6"/></svg>';
+function paintMute(){const b=$('muteBtn');b.innerHTML=SND.muted?SPK_OFF:SPK_ON;b.setAttribute('aria-label',SND.muted?'Turn sound on':'Mute sounds');b.setAttribute('aria-pressed',SND.muted)}
+$('muteBtn').onclick=()=>{SND.toggle();paintMute()};
+paintMute();
+document.addEventListener('pointerdown',()=>SND.unlock(),{capture:true});
 /* stop iOS double-tap zoom: the hand swallows native touch gestures (pointer events still fire), and a quick
    second tap anywhere else that isn't a control is cancelled */
 hand.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
@@ -672,7 +722,7 @@ window.claude?.hot?.snapshot?.(snap);
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 
 /* test hooks */
-window.__big2={cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
+window.__big2={SND,cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
 })();
 </script>
 

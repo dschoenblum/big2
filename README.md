@@ -33,6 +33,7 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Auto-pass:** if nothing in your hand beats the table, you pass automatically.
 - **Flush strip:** cards in a suit you hold 5 or more of get a thin strip along the bottom, so possible flushes are easy to spot.
 - **End of trick:** the board waits for you to tap **Next trick**.
+- **Sound:** effects are synthesized with Web Audio, so there are no audio files. The speaker button mutes them, and the choice is remembered. On iPhone, the silent switch also mutes them.
 - **Saving:** game state is saved in `localStorage`, so closing the tab doesn't lose a hand.
 
 ## Dev hooks
