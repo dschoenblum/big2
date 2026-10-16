@@ -22,7 +22,7 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Valid plays:** singles, pairs, triples, and five-card hands. The five-card hands rank, low to high: straight, flush, full house, four of a kind plus one card, straight flush.
 - **Straights:** A is high or low. 10-J-Q-K-A is the top straight and A-2-3-4-5 the lowest. Straights don't wrap around.
 - **Passing:** passing doesn't lock you out of the trick. When everyone else passes, the last player to play leads anything.
-- **Scoring:** losers pay 1 point per card left in hand, ×2 at 10 or more cards, ×3 at 13. The winner collects the total.
+- **Scoring:** penalty points, like Hearts. When someone goes out, every other player takes 1 point per card left, 2 per card at 10 or more, 3 per card at 13. The game ends after the hand where anyone reaches 50. Lowest total wins. A tie goes to whoever won more hands; if still tied, the win is shared.
 
 ## UI notes
 

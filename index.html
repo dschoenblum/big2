@@ -358,7 +358,7 @@ const SND=(()=>{
 let S;
 function freshState(scores){
   return{hands:[[],[],[],[]],turn:0,top:null,passes:0,acts:[null,null,null,null],first:true,over:false,
-    scores:scores||[0,0,0,0],round:1,sel:[],sort:'rank',hint:-1,flash:null,result:null};
+    scores:scores||[0,0,0,0],wins:[0,0,0,0],sv:2,round:1,gameOver:null,sel:[],sort:'rank',hint:-1,flash:null,result:null};
 }
 function deal(){
   clearTimeout(botTimer);S.handId=(S.handId||0)+1;
@@ -401,16 +401,25 @@ function nextTrick(){
   const w=S.flash.who;S.top=null;S.passes=0;S.acts=[null,null,null,null];S.turn=w;S.flash=null;S.anim=null;
   advance();
 }
+const GAME_TO=50;
+/* lowest total wins; ties go to most hands won, then it's shared */
+function gameWinners(){
+  const lo=Math.min(...S.scores);
+  let c=[0,1,2,3].filter(i=>S.scores[i]===lo);
+  const mw=Math.max(...c.map(i=>S.wins[i]));
+  return c.filter(i=>S.wins[i]===mw);
+}
 function penalty(n){return n===13?n*3:n>=10?n*2:n}
 function endHand(w){
   S.over=true;S.turn=-1;
-  const pen=S.hands.map((h,i)=>i===w?0:penalty(h.length));
-  const gain=sum(pen);
-  const delta=pen.map((x,i)=>i===w?gain:-x);
+  // penalty points: everyone but the winner takes points for the cards they still hold
+  const delta=S.hands.map((h,i)=>i===w?0:penalty(h.length));
   S.scores=S.scores.map((s,i)=>s+delta[i]);
+  S.wins[w]++;
   S.result={w,delta,left:S.hands.map(h=>h.slice())};
+  if(Math.max(...S.scores)>=GAME_TO) S.gameOver={winners:gameWinners()};
   save();render();
-  setTimeout(()=>{if(S.over){SND.play(w===0?'win':'lose');showResult()}},700);
+  setTimeout(()=>{if(S.over){const g=S.gameOver;SND.play((g?g.winners.includes(0):w===0)?'win':'lose');showResult()}},700);
 }
 let botTimer=null;
 function botDelay(){const p=S.turn;if(S.top&&!allPlays(S.hands[p]).some(legal))return 320;return S.top?560:680}
@@ -511,7 +520,7 @@ function cardHTML(c,extra=''){
 function sortedHand(){
   return S.hands[0].slice().sort((a,b)=>a-b);
 }
-const fmtScore=v=>v>0?'+'+v:v<0?'−'+Math.abs(v):'0';
+const fmtScore=v=>String(v);
 function seatHTML(p){
   const n=S.hands[p].length;
   const fan=`<div class="fan ${p===2?'h':'v'}" aria-label="${n} cards">${'<i></i>'.repeat(n)}</div>`;
@@ -617,17 +626,31 @@ function sheet(html,onMount){
 function closeSheet(){$('layer').innerHTML=''}
 function showResult(){
   const r=S.result;if(!r)return;
-  const rows=[0,1,2,3].map(i=>{
-    const d=r.delta[i];
-    return `<tr class="${i===r.w?'win':''}"><td>${i===0?'You':NAMES[i]}${r.left[i].length?`<div class="mini">${r.left[i].map(c=>cardHTML(c)).join('')}</div>`:''}</td>
-      <td class="n">${d>0?'+':d<0?'−':''}${Math.abs(d)}</td><td class="tot">${S.scores[i]<0?'−':''}${Math.abs(S.scores[i])}</td></tr>`}).join('');
-  sheet(`<h2>${r.w===0?'You win the hand':NAMES[r.w]+' wins the hand'}</h2>
-    <p class="sub">Hand ${S.round}. Losers pay 1 point per card left, double for 10+, triple for 13.</p>
+  const g=S.gameOver,nm=i=>i===0?'You':NAMES[i];
+  const order=g?[0,1,2,3].sort((a,b)=>S.scores[a]-S.scores[b]||S.wins[b]-S.wins[a]||a-b):[0,1,2,3];
+  const rows=order.map(i=>{
+    const d=r.delta[i],hi=g?g.winners.includes(i):i===r.w;
+    return `<tr class="${hi?'win':''}"><td>${nm(i)}${r.left[i].length?`<div class="mini">${r.left[i].map(c=>cardHTML(c)).join('')}</div>`:''}</td>
+      <td class="n">${d?'+'+d:'0'}</td><td class="tot">${S.scores[i]}</td></tr>`}).join('');
+  let title,sub,btn;
+  if(g){
+    const W=g.winners;
+    title=W.length>1?W.map(nm).join(' & ')+' share the win':W[0]===0?'You win the game!':NAMES[W[0]]+' wins the game';
+    const over=[0,1,2,3].filter(i=>S.scores[i]>=GAME_TO).map(nm);
+    sub=`${over.join(' & ')} reached ${GAME_TO} after hand ${S.round}, so the game is over. Lowest total wins.`;
+    btn='New game';
+  }else{
+    title=r.w===0?'You win the hand':NAMES[r.w]+' wins the hand';
+    sub=`Hand ${S.round}. Everyone else takes a point per card left (2 each at 10+, 3 each at 13). Game ends when someone reaches ${GAME_TO}; lowest total wins.`;
+    btn='Deal next hand';
+  }
+  sheet(`<h2>${title}</h2><p class="sub">${sub}</p>
     <table class="res"><tr><td style="color:var(--muted);font-size:12px;border:0">Player</td><td class="n" style="color:var(--muted);font-size:12px;border:0">Hand</td><td class="tot" style="font-size:12px;border:0">Total</td></tr>${rows}</table>
-    <button class="btn play" id="nextBtn">Deal next hand</button>`,()=>{$('nextBtn').onclick=()=>{closeSheet();S.round++;deal();advance()}});
+    <button class="btn play" id="nextBtn">${btn}</button>`,()=>{$('nextBtn').onclick=()=>{closeSheet();
+      if(S.gameOver){S=freshState();deal();advance()}else{S.round++;deal();advance()}}});
 }
 function showMenu(){
-  sheet(`<h2>Big 2</h2><p class="sub">Hand ${S.round} · Your total ${S.scores[0]}</p>
+  sheet(`<h2>Big 2</h2><p class="sub">Hand ${S.round} · You have ${S.scores[0]} point${S.scores[0]===1?'':'s'}. First to ${GAME_TO} ends the game; lowest total wins.</p>
   <div class="menu-list">
     <button class="btn" id="mRules">How to play</button>
     <button class="btn danger" id="mNew">New game (reset scores)</button>
@@ -649,6 +672,8 @@ function showRules(){
   <li>Five-card hands, low to high: straight, flush, full house, four of a kind (+1 card), straight flush</li></ul>
   <h3>Following</h3>
   <p>Play the same number of cards and beat the top play, or pass. Passing doesn't lock you out of the trick. When everyone else passes, the last player to play leads anything.</p>
+  <h3>Scoring</h3>
+  <p>When someone goes out, everyone else takes penalty points: 1 per card left, 2 per card with 10 or more, 3 per card if they never played (13 cards). The game ends after the hand where anyone reaches ${GAME_TO}. Lowest total wins; a tie goes to whoever won more hands.</p>
   <h3>Straights</h3>
   <p>A can be high or low. 10-J-Q-K-A is the top straight, A-2-3-4-5 the lowest. No wrapping (J-Q-K-A-2 isn't a straight).</p>
   <h3>Controls</h3>
@@ -716,6 +741,7 @@ function snap(){return{S:JSON.parse(JSON.stringify(S))}}
 function start(data){
   S=(data&&data.S)||load();
   if(!S){S=freshState();deal()}
+  if(S.sv!==2){S.scores=[0,0,0,0];S.wins=[0,0,0,0];S.sv=2;S.gameOver=null}
   if(S.top&&S.top.co) S.top.co=classify(S.top.co.cards);
   if(!S.over&&S.top&&S.passes>=3){S.flash={who:S.top.by};S.turn=-1}else S.flash=null;
   if(S.over){render();showResult()}else advance();
