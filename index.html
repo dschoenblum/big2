@@ -39,6 +39,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .top{display:flex;align-items:center;justify-content:space-between;height:40px;flex:none}
 .brand{font-family:var(--f-idx);font-weight:700;font-size:20px;letter-spacing:.04em}
 .brand b{color:var(--lacquer)}
+.hnum{font-family:var(--f-ui);font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin-left:10px;font-variant-numeric:tabular-nums}
 .top-r{display:flex;align-items:center;gap:6px}
 .icon-btn{width:44px;height:44px;margin-right:-6px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
 .icon-btn:active{background:var(--felt-line)}
@@ -198,7 +199,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 <body>
 <div id="app">
   <div class="top">
-    <div class="brand">BIG <b>2</b></div>
+    <div class="brand">BIG <b>2</b><span class="hnum" id="hnum"></span></div>
     <div class="top-r">
       <button class="icon-btn" id="muteBtn" aria-label="Mute sounds"></button>
       <button class="icon-btn" id="menuBtn" aria-label="Menu">
@@ -535,6 +536,7 @@ function slotHTML(p,animKey){
 }
 function render(){
   const myTurn=S.turn===0&&!S.over;
+  $('hnum').textContent='Hand '+S.round;
   $('app').classList.toggle('myturn',myTurn);
   { const el=$('seat0');el.className='seat s'+(myTurn?' turn':'')+(S.hands[0].length===1?' last':'');
     el.innerHTML=`<div class="who"><span class="nm">You</span><span class="sc">${fmtScore(S.scores[0])}</span></div>`; }
