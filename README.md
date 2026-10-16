@@ -1,0 +1,40 @@
+# Big 2
+
+A phone-first web version of the card game Big 2 (Big Two / Cho Dai Di). You play against three bots. It uses standard rules and keeps a running score.
+
+Everything is in one self-contained file, `index.html`: game engine, bots and UI. There is no build step and nothing to install. Open it in a browser, or serve it with GitHub Pages.
+
+## Run locally
+
+```sh
+python3 -m http.server 8000
+# open http://localhost:8000 (or your machine's LAN IP from an iPhone)
+```
+
+## Host on GitHub Pages
+
+Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pages sites are public even when the repo is private, unless you're on a plan that supports private Pages.
+
+## Rules implemented
+
+- **Card order:** 3 low through 2 high. Suits break ties: ♦ < ♣ < ♥ < ♠.
+- **First play:** whoever holds the 3♦ leads, and the first play must include it.
+- **Valid plays:** singles, pairs, triples, and five-card hands. The five-card hands rank, low to high: straight, flush, full house, four of a kind plus one card, straight flush.
+- **Straights:** A is high or low. 10-J-Q-K-A is the top straight and A-2-3-4-5 the lowest. Straights don't wrap around.
+- **Passing:** passing doesn't lock you out of the trick. When everyone else passes, the last player to play leads anything.
+- **Scoring:** losers pay 1 point per card left in hand, ×2 at 10 or more cards, ×3 at 13. The winner collects the total.
+
+## UI notes
+
+- **Selecting cards:**
+  - Tap a card to select it, or drag across several.
+  - When you're following, tapping a card also selects the cards that every legal play containing it shares. For example, tap one of three 6s against a triple and all three are picked.
+- **Dimmed cards:** on your turn, cards that can't be part of any legal play are dimmed and can't be selected.
+- **Auto-pass:** if nothing in your hand beats the table, you pass automatically.
+- **Flush strip:** cards in a suit you hold 5 or more of get a thin strip along the bottom, so possible flushes are easy to spot.
+- **End of trick:** the board waits for you to tap **Next trick**.
+- **Saving:** game state is saved in `localStorage`, so closing the tab doesn't lose a hand.
+
+## Dev hooks
+
+`window.__big2` exposes the engine (`classify`, `allPlays`, `beats`, `hintList`, state `S`, and so on). Use it for scripted testing, such as Playwright simulations.
