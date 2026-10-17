@@ -32,7 +32,9 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Dimmed cards:** on your turn, cards that can't be part of any legal play are dimmed and can't be selected.
 - **Auto-pass:** if nothing in your hand beats the table, you pass automatically.
 - **Flush strip:** cards in a suit you hold 5 or more of get a thin strip along the bottom, so possible flushes are easy to spot.
-- **End of trick:** the board waits for you to tap **Next trick**.
+- **End of trick:** the next trick starts after a 5-second countdown, or right away if you tap **Next trick** or the table. If you won the trick, tapping a card in your hand also starts it. If the page loses focus, the countdown is cancelled and the button is the only way to continue.
+- **Opening lead:** 3♦ is selected for you and can't be deselected.
+- **Debug:** the menu has "Debug: count every hand as my win", for testing the win celebration.
 - **Sound:** effects are synthesized with Web Audio, so there are no audio files. The speaker button mutes them, and the choice is remembered. On iPhone, the silent switch also mutes them.
 - **Saving:** game state is saved in `localStorage`, so closing the tab doesn't lose a hand.
 

@@ -191,6 +191,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .menu-list{display:flex;flex-direction:column;gap:8px}
 .menu-list .btn{justify-content:flex-start;padding:0 16px}
 .btn.danger{color:#ffb4a5}
+.menu-list .btn.dbg{font-size:14px;font-weight:500;color:var(--muted);justify-content:space-between}
+.btn.dbg span{font-weight:700;color:var(--ink)}
+.btn.dbg[aria-pressed="true"] span{color:var(--gold)}
+.hnum .dbgtag{color:var(--gold);margin-left:8px}
 .sheet .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 .sheet.won h2{color:var(--gold);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
@@ -372,6 +376,7 @@ function freshState(scores){
     scores:scores||[0,0,0,0],wins:[0,0,0,0],sv:2,round:1,gameOver:null,sel:[],sort:'rank',hint:-1,flash:null,result:null};
 }
 function deal(){
+  stopCountdown();
   clearTimeout(botTimer);S.handId=(S.handId||0)+1;
   const d=[...Array(52).keys()];
   for(let i=51;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]]}
@@ -402,17 +407,36 @@ function doPass(p){
   if(S.passes>=3){
     clearTimeout(botTimer);setTimeout(()=>SND.play('trick'),180);
     S.turn=-1;S.flash={who:S.top.by};save();render();
+    startCountdown();
     return;
   }
   S.turn=nextP(p);
   advance();
 }
+/* after a trick: count down 5s, then deal the next trick. Leaving the page (blur / hidden) cancels it for good;
+   coming back does not restart it, so the Next trick button is the only way on. */
+const cd={id:0,left:0};
+function stopCountdown(){clearTimeout(cd.id);cd.id=0;cd.left=0}
+function startCountdown(){
+  stopCountdown();
+  if(document.visibilityState!=='visible')return;
+  cd.left=5;render();
+  const tick=()=>{cd.id=setTimeout(()=>{if(!S.flash||!cd.left)return;cd.left--;if(cd.left<=0){cd.left=0;nextTrick();return}render();tick()},1000)};
+  tick();
+}
+const leave=()=>{if(cd.left){stopCountdown();render()}};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')leave()});
+window.addEventListener('blur',leave);
+window.addEventListener('pagehide',leave);
 function nextTrick(){
   if(!S.flash||S.over)return;
+  stopCountdown();
   const w=S.flash.who;S.top=null;S.passes=0;S.acts=[null,null,null,null];S.turn=w;S.flash=null;S.anim=null;
   advance();
 }
 const GAME_TO=50;
+const DEBUG={win:false};
+try{DEBUG.win=localStorage.getItem('big2-debugwin')==='1'}catch(_){}
 /* lowest total wins; ties go to most hands won, then it's shared */
 function gameWinners(){
   const lo=Math.min(...S.scores);
@@ -422,6 +446,7 @@ function gameWinners(){
 }
 function penalty(n){return n===13?n*3:n>=10?n*2:n}
 function endHand(w){
+  if(DEBUG.win)w=0;
   S.over=true;S.turn=-1;
   // penalty points: everyone but the winner takes points for the cards they still hold
   const delta=S.hands.map((h,i)=>i===w?0:penalty(h.length));
@@ -438,7 +463,7 @@ let botTimer=null;
 function botDelay(){const p=S.turn;if(S.top&&!allPlays(S.hands[p]).some(legal))return 320;return S.top?560:680}
 function advance(){
   clearTimeout(botTimer);
-  if(S.turn===0&&!S.over){const ok=playable();S.sel=S.sel.filter(c=>ok.has(c))}
+  if(S.turn===0&&!S.over){const ok=playable();S.sel=S.sel.filter(c=>ok.has(c));if(lock3()&&!S.sel.includes(0))S.sel.push(0)}
   save();render();
   if(S.over||S.turn<0) return;
   if(S.turn===0){
@@ -558,7 +583,7 @@ function slotHTML(p,animKey){
 }
 function render(){
   const myTurn=S.turn===0&&!S.over;
-  $('hnum').textContent='Hand '+S.round;
+  $('hnum').innerHTML='Hand '+S.round+(DEBUG.win?'<span class="dbgtag">Debug</span>':'');
   $('app').classList.toggle('myturn',myTurn);
   { const el=$('seat0');el.className='seat s'+(myTurn?' turn':'')+(S.hands[0].length===1?' last':'');
     el.innerHTML=`<div class="who"><span class="nm">You</span><span class="sc">${fmtScore(S.scores[0])}</span></div>`; }
@@ -593,7 +618,7 @@ function render(){
   // buttons
   const canBeat=myTurn?hintCache():false;
   $('playBtn').disabled=!ps.ok&&!S.flash;
-  $('playBtn').textContent=S.flash?'Next trick':ps.ok?'Play '+shortName(ps.co):'Play';
+  $('playBtn').textContent=S.flash?(cd.left?'Next trick · '+cd.left:'Next trick'):ps.ok?'Play '+shortName(ps.co):'Play';
   $('passBtn').disabled=!myTurn||!S.top;
   $('passBtn').classList.toggle('hot',myTurn&&!!S.top&&!canBeat);
 }
@@ -622,7 +647,9 @@ function fitTable(){
   if(need<=avail){tin.style.height=avail+'px';return}
   const z=avail/need;tin.style.zoom=z;tin.style.height=need+'px';
 }
-function clearSel(){S.sel=[];S.hint=-1;render()}
+function clearSel(){S.sel=lock3()?[0]:[];S.hint=-1;render()}
+/* the opening lead must include 3♦: keep it selected and locked */
+function lock3(){return S.first&&S.turn===0&&!S.over&&S.hands[0].includes(0)}
 let pc={k:'',v:null};
 function playable(){const k=S.hands[0].join()+'|'+(S.top?S.top.co.cards.join():'')+'|'+S.first;
   if(pc.k!==k){const set=new Set();if(!S.top&&!S.first)S.hands[0].forEach(c=>set.add(c));else allPlays(S.hands[0]).filter(legal).forEach(o=>o.cards.forEach(c=>set.add(c)));pc={k,v:set}}
@@ -709,9 +736,11 @@ function showMenu(){
   <div class="menu-list">
     <button class="btn" id="mRules">How to play</button>
     <button class="btn danger" id="mNew">New game (reset scores)</button>
+    <button class="btn dbg" id="mDbg" aria-pressed="${DEBUG.win}">Debug: count every hand as my win<span>${DEBUG.win?'On':'Off'}</span></button>
     <button class="btn" id="mClose">Back to table</button>
   </div>`,()=>{
     $('mRules').onclick=showRules;$('mClose').onclick=closeSheet;
+    $('mDbg').onclick=()=>{DEBUG.win=!DEBUG.win;try{localStorage.setItem('big2-debugwin',DEBUG.win?'1':'0')}catch(_){}render();showMenu()};
     $('mNew').onclick=()=>{sheet(`<h2>Start over?</h2><p class="sub">This deals a new hand and resets everyone's score to 0.</p>
       <div class="row2"><button class="btn" id="cNo">Cancel</button><button class="btn play" id="cYes">New game</button></div>`,()=>{
         $('cNo').onclick=closeSheet;$('cYes').onclick=()=>{closeSheet();S=freshState();deal();advance()}})};
@@ -732,7 +761,7 @@ function showRules(){
   <h3>Straights</h3>
   <p>A can be high or low. 10-J-Q-K-A is the top straight, A-2-3-4-5 the lowest. No wrapping (J-Q-K-A-2 isn't a straight).</p>
   <h3>Controls</h3>
-  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, tap Next trick (or the table) to continue</li><li>The speaker button at the top turns sounds on or off. On iPhone, the silent switch also mutes them</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
+  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the next one starts in 5 seconds, or tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. On iPhone, the silent switch also mutes them</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
   <div style="height:12px"></div><button class="btn" id="rBack">Done</button>`,()=>{$('rBack').onclick=closeSheet});
 }
 
@@ -753,11 +782,13 @@ function smartSelect(c){
   if(plays.length) plays[0].cards.filter(x=>plays.every(o=>o.cards.includes(x))).forEach(x=>setSel(x,true));
 }
 function blocked(c){return S.turn===0&&!S.over&&!playable().has(c)}
-function setSel(c,on){if(on&&blocked(c))return;const i=S.sel.indexOf(c);if(on&&i<0)S.sel.push(c);if(!on&&i>=0)S.sel.splice(i,1);
+function setSel(c,on){if(on&&blocked(c))return;if(!on&&c===0&&lock3())return;const i=S.sel.indexOf(c);if(on&&i<0)S.sel.push(c);if(!on&&i>=0)S.sel.splice(i,1);
   const el=hand.querySelector(`[data-c="${c}"]`);el&&el.classList.toggle('sel',on)}
 hand.addEventListener('pointerdown',e=>{
   if(S.over)return;const c=cardAt(e.clientX,e.clientY,true);if(c==null)return;
   e.preventDefault();
+  if(S.flash&&S.flash.who===0)nextTrick();
+  if(c===0&&lock3()&&S.sel.includes(0)){SND.play('deny');return}
   drag={on:!S.sel.includes(c),seen:new Set([c]),last:c};if(drag.on&&blocked(c))SND.play('deny');else SND.play('tap');if(drag.on)smartSelect(c);else setSel(c,false);S.hint=-1;
   try{hand.setPointerCapture(e.pointerId)}catch(_){}
 });
