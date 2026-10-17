@@ -164,6 +164,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .btn:disabled{opacity:.35;cursor:default}
 .btn.sort{font-size:11px;flex-direction:column;gap:1px;line-height:1.1;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
 .btn.sort span{font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0}
+.btn.play{position:relative;overflow:hidden;}
+.cdbar{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(255,255,255,.32);transform-origin:left center}
+.cdbar.run{animation:cdshrink 5s linear forwards}
+@keyframes cdshrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 .btn.play{background:var(--lacquer);color:var(--lacquer-ink);font-size:17px}
 .btn.play:active:not(:disabled){background:#bd3b25}
 .btn.play:disabled{background:rgba(255,255,255,.05);color:var(--dim);opacity:1;box-shadow:inset 0 0 0 1.5px rgba(212,71,47,.25)}
@@ -191,17 +195,39 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .menu-list{display:flex;flex-direction:column;gap:8px}
 .menu-list .btn{justify-content:flex-start;padding:0 16px}
 .btn.danger{color:#ffb4a5}
-.menu-list .btn.dbg{font-size:14px;font-weight:500;color:var(--muted);justify-content:space-between}
-.btn.dbg span{font-weight:700;color:var(--ink)}
-.btn.dbg[aria-pressed="true"] span{color:var(--gold)}
-.hnum .dbgtag{color:var(--gold);margin-left:8px}
+.gover{position:fixed;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;overflow:auto;
+  padding:calc(24px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));
+  background:radial-gradient(90% 60% at 50% 28%,#1c4a42 0%,#081a17 75%);animation:fade .3s}
+.gover.won{background:radial-gradient(90% 60% at 50% 26%,#5b4416 0%,#2a2410 35%,#081a17 80%)}
+.go-in{width:100%;max-width:440px;display:flex;flex-direction:column;align-items:center;text-align:center;animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
+.trophy{width:84px;height:84px;fill:var(--gold);filter:drop-shadow(0 6px 18px rgba(232,185,100,.45));margin-bottom:6px;animation:pop .6s .1s cubic-bezier(.2,1.8,.4,1) both}
+.go-kick{font-family:var(--f-idx);font-weight:700;font-size:15px;letter-spacing:.18em;text-transform:uppercase;color:var(--lacquer);margin:0 0 6px}
+.gover.won .go-kick{color:var(--gold)}
+.gover h2{font-family:var(--f-idx);font-weight:700;font-size:42px;line-height:1;margin:0 0 10px;letter-spacing:.01em;text-wrap:balance;color:var(--ink)}
+.gover.won h2{color:var(--gold);font-size:46px}
+.go-sub{color:var(--muted);font-size:15px;margin:0 0 20px;text-wrap:balance}
+.stand{list-style:none;margin:0 0 14px;padding:0;width:100%;display:flex;flex-direction:column;gap:8px}
+.stand li{display:grid;grid-template-columns:46px 1fr auto 52px;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.06);text-align:left}
+.stand li.first{background:rgba(232,185,100,.16);box-shadow:inset 0 0 0 1.5px var(--gold)}
+.stand li.me .nm{font-weight:700}
+.stand .pl{font-family:var(--f-idx);font-weight:700;font-size:18px;color:var(--muted)}
+.stand li.first .pl{color:var(--gold)}
+.stand .nm{font-size:17px;font-weight:600}
+.stand .hw{font-size:12px;color:var(--dim)}
+.stand .pt{font-family:var(--f-idx);font-weight:700;font-size:24px;text-align:right;font-variant-numeric:tabular-nums}
+.stand li.first .pt{color:var(--gold)}
+.go-last{font-size:13px;color:var(--dim);margin:0 0 18px}
+.gover .btn{width:100%;height:56px;font-size:18px}
 .sheet .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 .sheet.won h2{color:var(--gold);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
 .sheet.won.game h2{font-size:36px}
 .sheet.won .kicker{font-family:var(--f-idx);font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--lacquer);margin:0 0 2px;animation:pop .5s .05s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
+  /* the win celebration and the trick countdown bar still play */
+  .sheet.won h2,.sheet.won .kicker,.gover .go-in,.gover.won .trophy{animation-name:pop!important;animation-duration:.5s!important;animation-fill-mode:both!important}
+  .cdbar.run{animation:cdshrink 5s linear forwards!important}}
 </style>
 
 </head>
@@ -232,7 +258,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   <div class="hand" id="hand"></div>
   <div class="bar">
     <button class="btn pass" id="passBtn">Pass</button>
-    <button class="btn play" id="playBtn">Play</button>
+    <button class="btn play" id="playBtn"><span id="playLbl">Play</span><i class="cdbar" id="cdbar" hidden></i></button>
   </div>
 </div>
 <div id="layer"></div>
@@ -415,16 +441,16 @@ function doPass(p){
 }
 /* after a trick: count down 5s, then deal the next trick. Leaving the page (blur / hidden) cancels it for good;
    coming back does not restart it, so the Next trick button is the only way on. */
-const cd={id:0,left:0};
-function stopCountdown(){clearTimeout(cd.id);cd.id=0;cd.left=0}
+const cd={id:0,on:false};
+function cdBar(on){const b=$('cdbar');b.classList.remove('run');b.hidden=!on;if(on){void b.offsetWidth;b.classList.add('run')}}
+function stopCountdown(){clearTimeout(cd.id);cd.id=0;cd.on=false;cdBar(false)}
 function startCountdown(){
   stopCountdown();
   if(document.visibilityState!=='visible')return;
-  cd.left=5;render();
-  const tick=()=>{cd.id=setTimeout(()=>{if(!S.flash||!cd.left)return;cd.left--;if(cd.left<=0){cd.left=0;nextTrick();return}render();tick()},1000)};
-  tick();
+  cd.on=true;cdBar(true);
+  cd.id=setTimeout(()=>{if(S.flash&&cd.on){cd.on=false;cdBar(false);nextTrick()}},5000);
 }
-const leave=()=>{if(cd.left){stopCountdown();render()}};
+const leave=()=>{if(cd.on){stopCountdown();render()}};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')leave()});
 window.addEventListener('blur',leave);
 window.addEventListener('pagehide',leave);
@@ -435,8 +461,6 @@ function nextTrick(){
   advance();
 }
 const GAME_TO=50;
-const DEBUG={win:false};
-try{DEBUG.win=localStorage.getItem('big2-debugwin')==='1'}catch(_){}
 /* lowest total wins; ties go to most hands won, then it's shared */
 function gameWinners(){
   const lo=Math.min(...S.scores);
@@ -446,7 +470,6 @@ function gameWinners(){
 }
 function penalty(n){return n===13?n*3:n>=10?n*2:n}
 function endHand(w){
-  if(DEBUG.win)w=0;
   S.over=true;S.turn=-1;
   // penalty points: everyone but the winner takes points for the cards they still hold
   const delta=S.hands.map((h,i)=>i===w?0:penalty(h.length));
@@ -583,7 +606,7 @@ function slotHTML(p,animKey){
 }
 function render(){
   const myTurn=S.turn===0&&!S.over;
-  $('hnum').innerHTML='Hand '+S.round+(DEBUG.win?'<span class="dbgtag">Debug</span>':'');
+  $('hnum').textContent='Hand '+S.round;
   $('app').classList.toggle('myturn',myTurn);
   { const el=$('seat0');el.className='seat s'+(myTurn?' turn':'')+(S.hands[0].length===1?' last':'');
     el.innerHTML=`<div class="who"><span class="nm">You</span><span class="sc">${fmtScore(S.scores[0])}</span></div>`; }
@@ -618,7 +641,7 @@ function render(){
   // buttons
   const canBeat=myTurn?hintCache():false;
   $('playBtn').disabled=!ps.ok&&!S.flash;
-  $('playBtn').textContent=S.flash?(cd.left?'Next trick · '+cd.left:'Next trick'):ps.ok?'Play '+shortName(ps.co):'Play';
+  $('playLbl').textContent=S.flash?'Next trick':ps.ok?'Play '+shortName(ps.co):'Play';
   $('passBtn').disabled=!myTurn||!S.top;
   $('passBtn').classList.toggle('hot',myTurn&&!!S.top&&!canBeat);
 }
@@ -660,7 +683,6 @@ function hintCache(){const k=S.hands[0].join()+'|'+(S.top?S.top.co.cards.join():
 /* ---------- celebration: confetti and suit pips burst from your hand ---------- */
 let fxParts=[],fxRAF=0;
 function celebrate(big){
-  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const cv=$('fx'),dpr=Math.min(window.devicePixelRatio||1,3);
   cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;
   const COL=['#e8b964','#f4d58d','#d4472f','#fbf8f1','#c4302b','#7fd1b9'],GL=['♦','♣','♥','♠'];
@@ -706,6 +728,7 @@ function sheet(html,onMount,cls){
 function closeSheet(){$('layer').innerHTML=''}
 function showResult(){
   const r=S.result;if(!r)return;
+  if(S.gameOver){showGameOver();return}
   const g=S.gameOver,nm=i=>i===0?'You':NAMES[i];
   const order=g?[0,1,2,3].sort((a,b)=>S.scores[a]-S.scores[b]||S.wins[b]-S.wins[a]||a-b):[0,1,2,3];
   const rows=order.map(i=>{
@@ -731,16 +754,41 @@ function showResult(){
     <button class="btn play" id="nextBtn">${btn}</button>`,()=>{$('nextBtn').onclick=()=>{closeSheet();
       if(S.gameOver){S=freshState();deal();advance()}else{S.round++;deal();advance()}}},iWon?'won'+(g?' game':''):'');
 }
+/* end of game: a full-screen takeover, deliberately unlike the hand-result sheet */
+function showGameOver(){
+  const r=S.result,g=S.gameOver,W=g.winners,nm=i=>i===0?'You':NAMES[i];
+  const iWon=W.includes(0);
+  const list=a=>a.length>1?a.slice(0,-1).join(', ')+' & '+a[a.length-1]:a[0];
+  const order=[0,1,2,3].sort((a,b)=>S.scores[a]-S.scores[b]||S.wins[b]-S.wins[a]||a-b);
+  const ORD=['1st','2nd','3rd','4th'];
+  let place=0;
+  const rows=order.map((i,k)=>{
+    if(k>0){const p=order[k-1];if(S.scores[i]!==S.scores[p]||S.wins[i]!==S.wins[p])place=k}
+    return `<li class="${W.includes(i)?'first':''}${i===0?' me':''}"><span class="pl">${ORD[place]}</span><span class="nm">${nm(i)}</span>
+      <span class="hw">${S.wins[i]} hand${S.wins[i]===1?'':'s'} won</span><span class="pt">${S.scores[i]}</span></li>`}).join('');
+  const over=list([0,1,2,3].filter(i=>S.scores[i]>=GAME_TO).map(nm));
+  const title=W.length>1?list(W.map(nm))+' share the win':iWon?'You win the game!':NAMES[W[0]]+' wins the game';
+  const myPlace=ORD[order.indexOf(0)];
+  const trophy=`<svg class="trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 8h28v6h10v6c0 8-6 14-13 15-2 5-6 8-9 9v6h8v6H22v-6h8v-6c-3-1-7-4-9-9C14 34 8 28 8 20v-6h10zM14 20c0 4 2 7 5 8-1-3-1-6-1-8zm36 0h-4c0 2 0 5-1 8 3-1 5-4 5-8z"/></svg>`;
+  $('layer').innerHTML=`<div class="gover${iWon?' won':''}" role="dialog" aria-label="Game over"><div class="go-in">
+    ${iWon?trophy:''}
+    <p class="go-kick">Game over · ${S.round} hand${S.round===1?'':'s'}</p>
+    <h2>${title}</h2>
+    <p class="go-sub">${over} reached ${GAME_TO}. Lowest total wins${iWon?'':` · you finished ${myPlace}`}.</p>
+    <ol class="stand">${rows}</ol>
+    <p class="go-last">Last hand: ${r.w===0?'you went out':nm(r.w)+' went out'}${r.w===0?'':`, you took +${r.delta[0]}`}.</p>
+    <button class="btn play" id="againBtn">Play again</button>
+  </div></div>`;
+  $('againBtn').onclick=()=>{closeSheet();S=freshState();deal();advance()};
+}
 function showMenu(){
   sheet(`<h2>Big 2</h2><p class="sub">Hand ${S.round} · You have ${S.scores[0]} point${S.scores[0]===1?'':'s'}. First to ${GAME_TO} ends the game; lowest total wins.</p>
   <div class="menu-list">
     <button class="btn" id="mRules">How to play</button>
     <button class="btn danger" id="mNew">New game (reset scores)</button>
-    <button class="btn dbg" id="mDbg" aria-pressed="${DEBUG.win}">Debug: count every hand as my win<span>${DEBUG.win?'On':'Off'}</span></button>
     <button class="btn" id="mClose">Back to table</button>
   </div>`,()=>{
     $('mRules').onclick=showRules;$('mClose').onclick=closeSheet;
-    $('mDbg').onclick=()=>{DEBUG.win=!DEBUG.win;try{localStorage.setItem('big2-debugwin',DEBUG.win?'1':'0')}catch(_){}render();showMenu()};
     $('mNew').onclick=()=>{sheet(`<h2>Start over?</h2><p class="sub">This deals a new hand and resets everyone's score to 0.</p>
       <div class="row2"><button class="btn" id="cNo">Cancel</button><button class="btn play" id="cYes">New game</button></div>`,()=>{
         $('cNo').onclick=closeSheet;$('cYes').onclick=()=>{closeSheet();S=freshState();deal();advance()}})};
@@ -761,7 +809,7 @@ function showRules(){
   <h3>Straights</h3>
   <p>A can be high or low. 10-J-Q-K-A is the top straight, A-2-3-4-5 the lowest. No wrapping (J-Q-K-A-2 isn't a straight).</p>
   <h3>Controls</h3>
-  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the next one starts in 5 seconds, or tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. On iPhone, the silent switch also mutes them</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
+  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the bar on the Next trick button runs down for 5 seconds and then the next trick starts. Tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. On iPhone, the silent switch also mutes them</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
   <div style="height:12px"></div><button class="btn" id="rBack">Done</button>`,()=>{$('rBack').onclick=closeSheet});
 }
 
