@@ -190,6 +190,12 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .res td.n{text-align:right;width:56px}
 .res td.tot{text-align:right;width:56px;color:var(--muted)}
 .res tr.win td{color:var(--gold);font-weight:600}
+.res tr.me td{font-weight:800;color:var(--ink);background:rgba(255,255,255,.1);border-top-color:transparent;box-shadow:inset 0 1.5px 0 rgba(242,238,228,.5),inset 0 -1.5px 0 rgba(242,238,228,.5)}
+.res tr.me td:first-child{padding-left:12px;border-radius:12px 0 0 12px;box-shadow:inset 1.5px 1.5px 0 rgba(242,238,228,.5),inset 0 -1.5px 0 rgba(242,238,228,.5)}
+.res tr.me td:last-child{padding-right:12px;border-radius:0 12px 12px 0;box-shadow:inset -1.5px 1.5px 0 rgba(242,238,228,.5),inset 0 -1.5px 0 rgba(242,238,228,.5)}
+.res tr.me td:first-child{font-size:16px}
+.res tr.me.win td{color:var(--gold);background:rgba(232,185,100,.14)}
+.res tr.me+tr td{border-top-color:transparent}
 .res .mini{margin-top:4px;flex-wrap:wrap;row-gap:3px}
 .sheet .btn{width:100%}
 .menu-list{display:flex;flex-direction:column;gap:8px}
@@ -738,7 +744,7 @@ function showResult(){
   const order=g?[0,1,2,3].sort((a,b)=>S.scores[a]-S.scores[b]||S.wins[b]-S.wins[a]||a-b):[0,1,2,3];
   const rows=order.map(i=>{
     const d=r.delta[i],hi=g?g.winners.includes(i):i===r.w;
-    return `<tr class="${hi?'win':''}"><td>${nm(i)}${r.left[i].length?`<div class="mini">${r.left[i].map(c=>cardHTML(c)).join('')}</div>`:''}</td>
+    return `<tr class="${hi?'win':''}${i===0?' me':''}"><td>${nm(i)}${r.left[i].length?`<div class="mini">${r.left[i].map(c=>cardHTML(c)).join('')}</div>`:''}</td>
       <td class="n">${d?'+'+d:'0'}</td><td class="tot">${S.scores[i]}</td></tr>`}).join('');
   let title,sub,btn;
   if(g){
