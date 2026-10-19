@@ -30,7 +30,7 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Selecting cards:**
   - Tap a card to select it, or drag across several.
   - When you're following, tapping a card also selects the cards that every legal play containing it shares. For example, tap one of three 6s against a triple and all three are picked.
-- **Dimmed cards:** on your turn, cards that can't be part of any legal play are dimmed and can't be selected.
+- **Dimmed cards:** cards that can't beat what's on the table are dimmed and can't be selected. This applies through the whole trick, not just on your turn, because the table only goes up within a trick.
 - **Auto-pass:** if nothing in your hand beats the table, you pass automatically.
 - **Flush strip:** cards in a suit you hold 5 or more of get a thin strip along the bottom, so possible flushes are easy to spot.
 - **End of trick:** a bar on the **Next trick** button runs down over 3 seconds and then the next trick starts. It starts right away if you tap **Next trick** or the table. If you won the trick, tapping a card in your hand also starts it. If the page loses focus, the countdown is cancelled and the button is the only way to continue.

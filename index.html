@@ -697,7 +697,7 @@ function render(){
 /* your hand: one overlapping row with a slight arc, like cards held in a hand */
 function renderHand(myTurn){
   const h=$('hand'),cards=sortedHand(),n=cards.length;
-  const W=(h.clientWidth||376)-28,ok=myTurn?playable():stuck()?new Set():null;
+  const W=(h.clientWidth||376)-28,ok=dimSet();
   const sc=[0,0,0,0];cards.forEach(c=>sc[st(c)]++);
   const cw=Math.min(66,Math.round(W/5.6));
   const step=n>1?Math.min(cw*.62,(W-cw)/(n-1)):0;
@@ -867,9 +867,18 @@ function smartSelect(c){
   setSel(c,true);
   if(plays.length) plays[0].cards.filter(x=>plays.every(o=>o.cards.includes(x))).forEach(x=>setSel(x,true));
 }
-function blocked(c){return (S.turn===0&&!S.over&&!playable().has(c))||stuck()}
+function blocked(c){const ok=dimSet();return !!ok&&!ok.has(c)}
+/* Cards you could still play this trick. The table only goes up within a trick, so once a card can't beat
+   what's on top it stays dimmed until the trick ends, whether or not it's your turn. Nothing is dimmed when
+   you're on top or before anyone has led (you can't know yet what you'll need to beat). */
+function dimSet(){
+  if(S.over||S.flash)return null;
+  if(S.turn===0)return playable();
+  if(S.top&&S.top.by!==0)return playable();
+  return null;
+}
 /* nothing in your hand beats the table, and it only goes up within a trick: dim the whole hand until the trick ends */
-function stuck(){return !!(S.top&&S.top.by!==0&&!S.over&&!S.flash&&!hintCache())}
+
 function setSel(c,on){if(on&&blocked(c))return;if(!on&&c===0&&lock3())return;const i=S.sel.indexOf(c);if(on&&i<0)S.sel.push(c);if(!on&&i>=0)S.sel.splice(i,1);
   const el=hand.querySelector(`[data-c="${c}"]`);el&&el.classList.toggle('sel',on)}
 hand.addEventListener('pointerdown',e=>{
