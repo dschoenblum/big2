@@ -691,8 +691,7 @@ function render(){
   const canBeat=myTurn?hintCache():false;
   $('playBtn').disabled=!ps.ok&&!S.flash;
   $('playLbl').textContent=S.flash?'Next trick':ps.ok?'Play '+shortName(ps.co):'Play';
-  $('passBtn').disabled=!myTurn||!S.top;
-  $('passBtn').classList.toggle('hot',myTurn&&!!S.top&&!canBeat);
+  $('passBtn').disabled=!myTurn||!S.top||!canBeat; // nothing playable: the pass is automatic, so the button stays off
 }
 /* your hand: one overlapping row with a slight arc, like cards held in a hand */
 function renderHand(myTurn){
