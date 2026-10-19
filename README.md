@@ -20,7 +20,8 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Card order:** 3 low through 2 high. Suits break ties: ♦ < ♣ < ♥ < ♠.
 - **First play:** whoever holds the 3♦ leads, and the first play must include it.
 - **Valid plays:** singles, pairs, triples, and five-card hands. The five-card hands rank, low to high: straight, flush, full house, four of a kind plus one card, straight flush.
-- **Straights:** A is high or low. 10-J-Q-K-A is the top straight and A-2-3-4-5 the lowest. Straights don't wrap around.
+- **Straights:** A is high or low, and 2 can be low. From the bottom: A-2-3-4-5, then 2-3-4-5-6, then 3-4-5-6-7, and so on up to 10-J-Q-K-A at the top. Nothing wraps past A, so J-Q-K-A-2 isn't a straight.
+- **Flushes:** highest card first, then the next highest, and so on. Suit only decides when every rank matches.
 - **Passing:** passing doesn't lock you out of the trick. When everyone else passes, the last player to play leads anything.
 - **Scoring:** penalty points, like Hearts. When someone goes out, every other player takes 1 point per card left, 2 per card at 10 or more, 3 per card at 13. The game ends after the hand where anyone reaches 50. Lowest total wins. A tie goes to whoever won more hands; if still tied, the win is shared.
 
@@ -34,7 +35,7 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Flush strip:** cards in a suit you hold 5 or more of get a thin strip along the bottom, so possible flushes are easy to spot.
 - **End of trick:** a bar on the **Next trick** button runs down over 5 seconds and then the next trick starts. It starts right away if you tap **Next trick** or the table. If you won the trick, tapping a card in your hand also starts it. If the page loses focus, the countdown is cancelled and the button is the only way to continue.
 - **Opening lead:** 3♦ is selected for you and can't be deselected.
-- **Sound:** effects are synthesized with Web Audio, so there are no audio files. The speaker button mutes them, and the choice is remembered. On iPhone, the silent switch also mutes them.
+- **Sound:** effects are synthesized with Web Audio, so there are no audio files. The speaker button mutes them, and the choice is remembered. On iPhone, sound follows the volume buttons even with the silent switch on. This uses a `playback` audio session, or a silent looping audio element on older iOS, so other music may pause while sound is on.
 - **Game over:** a full-screen standings view, with a trophy and confetti if you win. The win celebration plays even with Reduce Motion on.
 - **Saving:** game state is saved in `localStorage`, so closing the tab doesn't lose a hand.
 

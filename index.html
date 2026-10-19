@@ -228,7 +228,6 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .sheet .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 .sheet.won h2{color:var(--gold);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
-.sheet.won.game h2{font-size:36px}
 .sheet.won .kicker{font-family:var(--f-idx);font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--lacquer);margin:0 0 2px;animation:pop .5s .05s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
@@ -363,9 +362,25 @@ const SND=(()=>{
   try{muted=localStorage.getItem('big2-mute')==='1'}catch(_){}
   function ac(){
     if(!ctx){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;try{ctx=new A()}catch(_){return null}}
-    if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+    if(ctx.state!=='running')ctx.resume().catch(()=>{}); // covers 'suspended' and iOS 'interrupted'
     return ctx;
   }
+  /* iOS: Web Audio follows the silent switch by default. A 'playback' audio session (Safari 16.4+) makes it follow
+     the volume buttons instead; older Safari gets the same effect from a looping silent <audio> element. */
+  let tag=null;
+  function silentWav(){const n=4000,b=new Uint8Array(44+n),v=new DataView(b.buffer),w=(o,t)=>{for(let i=0;i<t.length;i++)b[o+i]=t.charCodeAt(i)};
+    w(0,'RIFF');v.setUint32(4,36+n,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+    v.setUint32(24,8000,true);v.setUint32(28,8000,true);v.setUint16(32,1,true);v.setUint16(34,8,true);w(36,'data');v.setUint32(40,n,true);b.fill(128,44);
+    let t='';for(const x of b)t+=String.fromCharCode(x);return 'data:audio/wav;base64,'+btoa(t)}
+  function session(on){
+    try{
+      if(navigator.audioSession){navigator.audioSession.type=on?'playback':'ambient';return}
+      if(on){if(!tag){tag=document.createElement('audio');tag.loop=true;tag.preload='auto';tag.setAttribute('playsinline','');tag.src=silentWav()}
+        if(tag.paused)tag.play().catch(()=>{})}
+      else if(tag)tag.pause();
+    }catch(_){}
+  }
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible'&&tag)tag.pause()});
   function tone(f,t,dur,type,vol,f2){
     const o=ctx.createOscillator(),g=ctx.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);
     if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
@@ -395,18 +410,20 @@ const SND=(()=>{
     lose:t=>[392,330,262].forEach((f,i)=>tone(f,t+i*.14,.32,'triangle',.07)),
   };
   return{
-    unlock(){if(!muted)ac()},
-    play(name,arg){if(muted)return;const c=ac();if(!c||c.state!=='running')return;try{P[name](c.currentTime+.01,arg||1)}catch(_){}},
+    unlock(){if(!muted){session(true);ac()}},
+    play(name,arg){if(muted)return;const c=ac();if(!c)return;
+      const go=()=>{try{P[name](c.currentTime+.01,arg||1)}catch(_){}};
+      if(c.state==='running')go();else c.resume().then(()=>{if(c.state==='running'&&!muted)go()}).catch(()=>{})},
     get muted(){return muted},
-    toggle(){muted=!muted;try{localStorage.setItem('big2-mute',muted?'1':'0')}catch(_){}if(!muted){ac();setTimeout(()=>SND.play('tap'),30)}return muted},
+    toggle(){muted=!muted;try{localStorage.setItem('big2-mute',muted?'1':'0')}catch(_){}session(!muted);if(!muted){ac();setTimeout(()=>SND.play('tap'),30)}return muted},
   };
 })();
 
 /* ---------- state ---------- */
 let S;
-function freshState(scores){
+function freshState(){
   return{hands:[[],[],[],[]],turn:0,top:null,passes:0,acts:[null,null,null,null],first:true,over:false,
-    scores:scores||[0,0,0,0],wins:[0,0,0,0],sv:2,round:1,gameOver:null,sel:[],sort:'rank',hint:-1,flash:null,result:null};
+    scores:[0,0,0,0],wins:[0,0,0,0],sv:2,round:1,gameOver:null,sel:[],flash:null,result:null};
 }
 function deal(){
   stopCountdown();
@@ -415,7 +432,7 @@ function deal(){
   for(let i=51;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]]}
   for(let p=0;p<4;p++) S.hands[p]=d.slice(p*13,p*13+13).sort((a,b)=>a-b);
   S.turn=S.hands.findIndex(h=>h.includes(0));
-  S.top=null;S.passes=0;S.acts=[null,null,null,null];S.first=true;S.over=false;S.sel=[];S.hint=-1;S.result=null;S.flash=null;
+  S.top=null;S.passes=0;S.acts=[null,null,null,null];S.first=true;S.over=false;S.sel=[];S.result=null;S.flash=null;
 }
 const nextP=p=>(p+1)%4;
 
@@ -429,14 +446,14 @@ function doPlay(p,cards){
   S.hands[p]=S.hands[p].filter(c=>!cards.includes(c));
   S.top={co,by:p};S.passes=0;S.first=false;S.acts[p]={play:co.cards};
   S.anim=p;SND.play('play',cards.length);
-  if(p===0){S.sel=[];S.hint=-1}
+  if(p===0)S.sel=[];
   if(!S.hands[p].length){endHand(p);return}
   S.turn=nextP(p);
   advance();
 }
 function doPass(p){
   S.acts[p]={pass:true};S.passes++;SND.play('pass');
-  if(p===0){S.sel=[];S.hint=-1}
+  if(p===0)S.sel=[];
   if(S.passes>=3){
     clearTimeout(botTimer);setTimeout(()=>SND.play('trick'),180);
     S.turn=-1;S.flash={who:S.top.by};save();render();
@@ -521,7 +538,7 @@ function botMove(){
   const breaks=o=>{let pen=0;
     if(o.n<5){const r=rk(o.cards[0]);if(byR[r]>o.n)pen+=8*(byR[r]-o.n)}
     return pen};
-  const high=o=>o.cards.filter(c=>rk(o.cards[0])>=0&&rk(c)>=11).length;
+  const high=o=>o.cards.filter(c=>rk(c)>=11).length;
   let best=null,bc=Infinity;
   const leading=!S.top;
   const low=Math.min(...hand);
@@ -572,8 +589,6 @@ function hintList(){
   else opts.sort((a,b)=>a.key-b.key||sum(a.cards)-sum(b.cards));
   return opts;
 }
-let statusFlash=null;
-function flashStatus(t){statusFlash=t;render();setTimeout(()=>{statusFlash=null;render()},1600)}
 
 /* ---------- rendering ---------- */
 const $=id=>document.getElementById(id);
@@ -633,8 +648,7 @@ function render(){
   const ps=playState();
   const clr=' <button class="clear" id="clearBtn">Clear</button>';
   let msg='';
-  if(statusFlash) msg=`<span class="warn">${statusFlash}</span>`;
-  else if(S.over) msg='';
+  if(S.over) msg='';
   else if(S.flash) msg=S.flash.who===0?'You won the trick. You lead next':NAMES[S.flash.who]+' won the trick. '+NAMES[S.flash.who]+' leads next';
   else if(myTurn){
     if(S.sel.length) msg=(ps.ok?describe(ps.co):`<span class="warn">${ps.msg}</span>`)+clr;
@@ -677,7 +691,7 @@ function fitTable(){
   if(need<=avail){tin.style.height=avail+'px';return}
   const z=avail/need;tin.style.zoom=z;tin.style.height=need+'px';
 }
-function clearSel(){S.sel=lock3()?[0]:[];S.hint=-1;render()}
+function clearSel(){S.sel=lock3()?[0]:[];render()}
 /* the opening lead must include 3♦: keep it selected and locked */
 function lock3(){return S.first&&S.turn===0&&!S.over&&S.hands[0].includes(0)}
 let pc={k:'',v:null};
@@ -736,30 +750,17 @@ function closeSheet(){$('layer').innerHTML=''}
 function showResult(){
   const r=S.result;if(!r)return;
   if(S.gameOver){showGameOver();return}
-  const g=S.gameOver,nm=i=>i===0?'You':NAMES[i];
-  const order=g?[0,1,2,3].sort((a,b)=>S.scores[a]-S.scores[b]||S.wins[b]-S.wins[a]||a-b):[0,1,2,3];
-  const rows=order.map(i=>{
-    const d=r.delta[i],hi=g?g.winners.includes(i):i===r.w;
-    return `<tr class="${hi?'win':''}${i===0?' me':''}"><td>${nm(i)}${r.left[i].length?`<div class="mini">${r.left[i].map(c=>cardHTML(c)).join('')}</div>`:''}</td>
+  const nm=i=>i===0?'You':NAMES[i];
+  const rows=[0,1,2,3].map(i=>{
+    const d=r.delta[i];
+    return `<tr class="${i===r.w?'win':''}${i===0?' me':''}"><td>${nm(i)}${r.left[i].length?`<div class="mini">${r.left[i].map(c=>cardHTML(c)).join('')}</div>`:''}</td>
       <td class="n">${d?'+'+d:'0'}</td><td class="tot">${S.scores[i]}</td></tr>`}).join('');
-  let title,sub,btn;
-  if(g){
-    const W=g.winners;
-    title=W.length>1?W.map(nm).slice(0,-1).join(', ')+' & '+nm(W[W.length-1])+' share the win':W[0]===0?'You win the game!':NAMES[W[0]]+' wins the game';
-    const over=[0,1,2,3].filter(i=>S.scores[i]>=GAME_TO).map(nm);
-    sub=`${over.length>1?over.slice(0,-1).join(', ')+' & '+over[over.length-1]:over[0]} reached ${GAME_TO} after hand ${S.round}, so the game is over. Lowest total wins.`;
-    btn='New game';
-  }else{
-    title=r.w===0?'You win the hand':NAMES[r.w]+' wins the hand';
-    sub=`Hand ${S.round}. Everyone else takes a point per card left (2 each at 10+, 3 each at 13). Game ends when someone reaches ${GAME_TO}; lowest total wins.`;
-    btn='Deal next hand';
-  }
-  const iWon=g?g.winners.includes(0):r.w===0;
-  const kick=iWon?(g?'<p class="kicker">Champion</p>':'<p class="kicker">Out first</p>'):'';
-  sheet(`${kick}<h2>${title}</h2><p class="sub">${sub}</p>
+  const iWon=r.w===0;
+  const title=iWon?'You win the hand':NAMES[r.w]+' wins the hand';
+  const sub=`Hand ${S.round}. Everyone else takes a point per card left (2 each at 10+, 3 each at 13). Game ends when someone reaches ${GAME_TO}; lowest total wins.`;
+  sheet(`${iWon?'<p class="kicker">Out first</p>':''}<h2>${title}</h2><p class="sub">${sub}</p>
     <table class="res"><tr><td style="color:var(--muted);font-size:12px;border:0">Player</td><td class="n" style="color:var(--muted);font-size:12px;border:0">Hand</td><td class="tot" style="font-size:12px;border:0">Total</td></tr>${rows}</table>
-    <button class="btn play" id="nextBtn">${btn}</button>`,()=>{$('nextBtn').onclick=()=>{closeSheet();
-      if(S.gameOver){S=freshState();deal();advance()}else{S.round++;deal();advance()}}},iWon?'won'+(g?' game':''):'');
+    <button class="btn play" id="nextBtn">Deal next hand</button>`,()=>{$('nextBtn').onclick=()=>{closeSheet();S.round++;deal();advance()}},iWon?'won':'');
 }
 /* end of game: a full-screen takeover, deliberately unlike the hand-result sheet */
 function showGameOver(){
@@ -814,9 +815,11 @@ function showRules(){
   <h3>Scoring</h3>
   <p>When someone goes out, everyone else takes penalty points: 1 per card left, 2 per card with 10 or more, 3 per card if they never played (13 cards). The game ends after the hand where anyone reaches ${GAME_TO}. Lowest total wins; a tie goes to whoever won more hands.</p>
   <h3>Straights</h3>
-  <p>A can be high or low. 10-J-Q-K-A is the top straight, A-2-3-4-5 the lowest. No wrapping (J-Q-K-A-2 isn't a straight).</p>
+  <p>A can be high or low, and 2 can be low. From lowest to highest: A-2-3-4-5, 2-3-4-5-6, 3-4-5-6-7, and so on up to 10-J-Q-K-A, the top straight. No wrapping past A (J-Q-K-A-2 and Q-K-A-2-3 aren't straights).</p>
+  <h3>Flushes</h3>
+  <p>Compare the highest cards first, then the next highest, and so on. Suit only decides when every rank matches. So A-7-5-4-3 beats K-Q-J-10-8.</p>
   <h3>Controls</h3>
-  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the bar on the Next trick button runs down for 5 seconds and then the next trick starts. Tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. On iPhone, the silent switch also mutes them</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
+  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the bar on the Next trick button runs down for 5 seconds and then the next trick starts. Tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. Sound follows your volume buttons, even with the silent switch on</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
   <div style="height:12px"></div><button class="btn" id="rBack">Done</button>`,()=>{$('rBack').onclick=closeSheet});
 }
 
@@ -844,7 +847,7 @@ hand.addEventListener('pointerdown',e=>{
   e.preventDefault();
   if(S.flash&&S.flash.who===0)nextTrick();
   if(c===0&&lock3()&&S.sel.includes(0)){SND.play('deny');return}
-  drag={on:!S.sel.includes(c),seen:new Set([c]),last:c};if(drag.on&&blocked(c))SND.play('deny');else SND.play('tap');if(drag.on)smartSelect(c);else setSel(c,false);S.hint=-1;
+  drag={on:!S.sel.includes(c),seen:new Set([c]),last:c};if(drag.on&&blocked(c))SND.play('deny');else SND.play('tap');if(drag.on)smartSelect(c);else setSel(c,false);
   try{hand.setPointerCapture(e.pointerId)}catch(_){}
 });
 hand.addEventListener('pointermove',e=>{
@@ -876,11 +879,25 @@ document.querySelector('.table').addEventListener('click',()=>{if(S.flash)nextTr
 
 /* ---------- persistence ---------- */
 function save(){try{localStorage.setItem('big2-state',JSON.stringify(S))}catch(_){}}
-function load(){try{const s=JSON.parse(localStorage.getItem('big2-state'));if(s&&s.hands&&s.hands.length===4)return s}catch(_){}return null}
+function load(){try{const s=JSON.parse(localStorage.getItem('big2-state'));if(validSave(s))return s}catch(_){}return null}
+/* only restore a save that could have come from this game; anything else starts a fresh deal */
+function validSave(s){
+  if(!s||typeof s!=='object'||!Array.isArray(s.hands)||s.hands.length!==4)return false;
+  const isCard=c=>Number.isInteger(c)&&c>=0&&c<52;
+  const all=s.hands.flat();if(!all.every(isCard)||new Set(all).size!==all.length)return false;
+  if(!Array.isArray(s.sel)||!s.sel.every(isCard))return false;
+  if(!Array.isArray(s.scores)||s.scores.length!==4||!s.scores.every(Number.isInteger))return false;
+  if(!Array.isArray(s.acts)||s.acts.length!==4||!s.acts.every(a=>a===null||a.pass===true||(Array.isArray(a.play)&&a.play.every(isCard))))return false;
+  if(s.top&&!(s.top.co&&Array.isArray(s.top.co.cards)&&s.top.co.cards.every(isCard)&&[0,1,2,3].includes(s.top.by)))return false;
+  if(![-1,0,1,2,3].includes(s.turn))return false;
+  if(s.turn===-1&&!s.over&&!(s.top&&s.passes>=3))return false; // nobody's turn and nothing to resolve: a dead table
+  if(s.over&&!s.result)return false;
+  return true;
+}
 function snap(){return{S:JSON.parse(JSON.stringify(S))}}
 
 function start(data){
-  S=(data&&data.S)||load();
+  S=(data&&validSave(data.S)&&data.S)||load();
   if(!S){S=freshState();deal()}
   if(S.sv!==2){S.scores=[0,0,0,0];S.wins=[0,0,0,0];S.sv=2;S.gameOver=null}
   if(S.top&&S.top.co) S.top.co=classify(S.top.co.cards);
