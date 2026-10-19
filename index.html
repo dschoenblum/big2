@@ -166,7 +166,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .btn.sort span{font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0}
 .btn.play{position:relative;overflow:hidden;}
 .cdbar{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(255,255,255,.32);transform-origin:left center}
-.cdbar.run{animation:cdshrink 5s linear forwards}
+.cdbar.run{animation:cdshrink 3s linear forwards}
 @keyframes cdshrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 .btn.play{background:var(--lacquer);color:var(--lacquer-ink);font-size:17px}
 .btn.play:active:not(:disabled){background:#bd3b25}
@@ -233,7 +233,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
   /* the win celebration and the trick countdown bar still play */
   .sheet.won h2,.sheet.won .kicker,.gover .go-in,.gover.won .trophy{animation-name:pop!important;animation-duration:.5s!important;animation-fill-mode:both!important}
-  .cdbar.run{animation:cdshrink 5s linear forwards!important}}
+  .cdbar.run{animation:cdshrink 3s linear forwards!important}}
 </style>
 
 </head>
@@ -448,8 +448,36 @@ function doPlay(p,cards){
   S.anim=p;SND.play('play',cards.length);
   if(p===0)S.sel=[];
   if(!S.hands[p].length){endHand(p);return}
+  if(!canBeatFrom(S.hands.flat(),co)){ // nothing still in play can beat it: the trick ends now
+    clearTimeout(botTimer);
+    S.passes=3;S.turn=-1;S.flash={who:p,auto:true};save();render();
+    setTimeout(()=>SND.play('trick'),180);
+    startCountdown();
+    return;
+  }
   S.turn=nextP(p);
   advance();
+}
+/* Could any combination of these cards beat co? Uses every unplayed card (public information only),
+   so ending a trick early never reveals who holds what. Checks the best candidate of each shape. */
+function canBeatFrom(pool,co){
+  const byR={},byS=[[],[],[],[]];
+  pool.forEach(c=>{(byR[rk(c)]=byR[rk(c)]||[]).push(c);byS[st(c)].push(c)});
+  if(co.n===1) return pool.some(c=>c>co.key);
+  if(co.n===2) return Object.values(byR).some(g=>g.length>=2&&Math.max(...g)>co.key);
+  if(co.n===3) return Object.values(byR).some(g=>g.length>=3&&rk(g[0])>co.key);
+  const cand=[];
+  for(const g of byS) if(g.length>=5){ // best flush in each suit, and every straight flush
+    cand.push(g.slice().sort((a,b)=>b-a).slice(0,5));
+    for(let s=1;s<=10;s++){const run=[];for(let k=0;k<5;k++){const v=s+k,c=g.find(x=>{const n=nat(rk(x));return n===v||(v===1&&n===14)});if(c==null)break;run.push(c)}if(run.length===5)cand.push(run)}
+  }
+  const ranks=Object.keys(byR).map(Number);
+  for(const r of ranks){const g=byR[r];
+    if(g.length===4){const k=pool.find(c=>rk(c)!==r);if(k!=null)cand.push([...g,k])}
+    if(g.length>=3){const pr=ranks.find(q=>q!==r&&byR[q].length>=2);if(pr!=null)cand.push([...g.slice(0,3),...byR[pr].slice(0,2)])}
+  }
+  for(let s=1;s<=10;s++){const run=[];for(let k=0;k<5;k++){const v=s+k,opts=pool.filter(x=>{const n=nat(rk(x));return n===v||(v===1&&n===14)});if(!opts.length)break;run.push(Math.max(...opts))}if(run.length===5)cand.push(run)}
+  return cand.some(c=>{const x=classify(c);return x&&x.n===5&&x.key>co.key});
 }
 function doPass(p){
   S.acts[p]={pass:true};S.passes++;SND.play('pass');
@@ -472,7 +500,7 @@ function startCountdown(){
   stopCountdown();
   if(document.visibilityState!=='visible')return;
   cd.on=true;cdBar(true);
-  cd.id=setTimeout(()=>{if(S.flash&&cd.on){cd.on=false;cdBar(false);nextTrick()}},5000);
+  cd.id=setTimeout(()=>{if(S.flash&&cd.on){cd.on=false;cdBar(false);nextTrick()}},3000);
 }
 const leave=()=>{if(cd.on){stopCountdown();render()}};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')leave()});
@@ -617,7 +645,7 @@ function slotHTML(p,animKey){
     const isTop=S.top&&S.top.by===p;
     const won=isTop&&S.flash;
     const co=classify(a.play);
-    const lbl=won?(p===0?'You won the trick':'Won the trick'):isTop&&co.n>1?describe(co):'';
+    const lbl=won?(S.flash.auto?'Unbeatable':(p===0?'You won the trick':'Won the trick')):isTop&&co.n>1?describe(co):'';
     const anim=isTop&&animKey;
     return `<div class="play ${isTop?'top':'old'}${won?' won':''}${anim?' anim':''}" style="--fx:${FROM[p][0]};--fy:${FROM[p][1]}">
       <div class="cards n${a.play.length}">${a.play.map(c=>cardHTML(c)).join('')}</div>${lbl?`<div class="plbl">${lbl}</div>`:''}${S.turn===p&&p&&!isTop?'<span class="chip think">Thinking</span>':''}</div>`;
@@ -649,7 +677,7 @@ function render(){
   const clr=' <button class="clear" id="clearBtn">Clear</button>';
   let msg='';
   if(S.over) msg='';
-  else if(S.flash) msg=S.flash.who===0?'You won the trick. You lead next':NAMES[S.flash.who]+' won the trick. '+NAMES[S.flash.who]+' leads next';
+  else if(S.flash) msg=(S.flash.auto?'Nothing can beat that. ':'')+(S.flash.who===0?'You won the trick. You lead next':NAMES[S.flash.who]+' won the trick. '+NAMES[S.flash.who]+' leads next');
   else if(myTurn){
     if(S.sel.length) msg=(ps.ok?describe(ps.co):`<span class="warn">${ps.msg}</span>`)+clr;
     else if(S.top&&!hintCache()) msg='<span class="warn">Nothing beats it. Passing…</span>';
@@ -819,7 +847,7 @@ function showRules(){
   <h3>Flushes</h3>
   <p>Compare the highest cards first, then the next highest, and so on. Suit only decides when every rank matches. So A-7-5-4-3 beats K-Q-J-10-8.</p>
   <h3>Controls</h3>
-  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the bar on the Next trick button runs down for 5 seconds and then the next trick starts. Tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. Sound follows your volume buttons, even with the silent switch on</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
+  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>If a play can't be beaten by any card still in play (like 2♠ as a single), the trick ends right away</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the bar on the Next trick button runs down for 3 seconds and then the next trick starts. Tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. Sound follows your volume buttons, even with the silent switch on</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
   <div style="height:12px"></div><button class="btn" id="rBack">Done</button>`,()=>{$('rBack').onclick=closeSheet});
 }
 
@@ -908,7 +936,7 @@ window.claude?.hot?.snapshot?.(snap);
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 
 /* test hooks */
-window.__big2={celebrate,SND,cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
+window.__big2={canBeatFrom,celebrate,SND,cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
 })();
 </script>
 

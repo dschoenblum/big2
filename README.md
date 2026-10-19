@@ -33,7 +33,8 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Dimmed cards:** on your turn, cards that can't be part of any legal play are dimmed and can't be selected.
 - **Auto-pass:** if nothing in your hand beats the table, you pass automatically.
 - **Flush strip:** cards in a suit you hold 5 or more of get a thin strip along the bottom, so possible flushes are easy to spot.
-- **End of trick:** a bar on the **Next trick** button runs down over 5 seconds and then the next trick starts. It starts right away if you tap **Next trick** or the table. If you won the trick, tapping a card in your hand also starts it. If the page loses focus, the countdown is cancelled and the button is the only way to continue.
+- **End of trick:** a bar on the **Next trick** button runs down over 3 seconds and then the next trick starts. It starts right away if you tap **Next trick** or the table. If you won the trick, tapping a card in your hand also starts it. If the page loses focus, the countdown is cancelled and the button is the only way to continue.
+- **Unbeatable plays:** if nothing among the cards still in play can beat a play, the trick ends right away instead of waiting for everyone to pass. Examples are 2♠ as a single, or four 2s when no straight flush is possible. The check uses all unplayed cards, so it never reveals who holds what.
 - **Opening lead:** 3♦ is selected for you and can't be deselected.
 - **Sound:** effects are synthesized with Web Audio, so there are no audio files. The speaker button mutes them, and the choice is remembered. On iPhone, sound follows the volume buttons even with the silent switch on. This uses a `playback` audio session, or a silent looping audio element on older iOS, so other music may pause while sound is on.
 - **Game over:** a full-screen standings view, with a trophy and confetti if you win. The win celebration plays even with Reduce Motion on.
