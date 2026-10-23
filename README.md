@@ -38,6 +38,7 @@ Go to Settings → Pages → Deploy from branch → `main` / root. Note that Pag
 - **Opening lead:** 3♦ is selected for you and can't be deselected.
 - **Sound:** effects are synthesized with Web Audio, so there are no audio files. The speaker button mutes them, and the choice is remembered. On iPhone, sound follows the volume buttons even with the silent switch on. This uses a `playback` audio session, or a silent looping audio element on older iOS, so other music may pause while sound is on.
 - **Game over:** a full-screen standings view, with a trophy and confetti if you win. The win celebration plays even with Reduce Motion on.
+- **Your record:** lifetime stats are kept automatically in `localStorage` under `big2-stats`, with no login. They cover games and hands won, win streak and best streak, finishes (1st–4th), average points taken, lowest final score, toughest opponent, and recent games. Open them from the menu (Your record) or from the line on the game-over screen, which also calls out a first win, a new best streak or a new lowest score. Reloads never count a hand or game twice.
 - **Saving:** game state is saved in `localStorage`, so closing the tab doesn't lose a hand.
 
 ## Dev hooks

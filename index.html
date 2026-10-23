@@ -230,6 +230,40 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .go-last{font-size:13px;color:var(--dim);margin:0 0 18px}
 .gover .btn{width:100%;height:56px;font-size:18px}
 .sheet .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+/* record: your lifetime stats, kept in localStorage */
+.go-rec{font-size:13px;color:var(--muted);margin:-8px 0 16px;min-height:40px;display:inline-flex;align-items:center;gap:6px;padding:0 12px}
+.go-rec b{color:var(--ink);font-weight:600}
+.go-rec::after{content:"›";font-size:17px;color:var(--dim)}
+.gover.won .go-rec b{color:var(--gold)}
+.go-rec.pb{color:var(--ink);font-weight:600}
+.go-rec.pb b{color:var(--gold)}
+.menu-list .btn .mx{margin-left:auto;font-size:13px;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 4px}
+.tile{background:rgba(255,255,255,.06);border-radius:14px;padding:12px 14px 10px;text-align:left}
+.tile.hi{background:rgba(232,185,100,.12);box-shadow:inset 0 0 0 1.5px rgba(232,185,100,.5)}
+.tile .v{font-family:var(--f-idx);font-weight:700;font-size:30px;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.tile.hi .v{color:var(--gold)}
+.tile .v small{font-size:16px;color:var(--muted);font-weight:600;margin-left:3px}
+.tile .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:5px;font-weight:600}
+.places{display:flex;height:10px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.07);margin:8px 0 6px}
+.places i{display:block;height:100%}
+.places i:nth-child(1){background:var(--gold)}.places i:nth-child(2){background:#9fb8b0}.places i:nth-child(3){background:#5f7f76}.places i:nth-child(4){background:#3b5c54}
+.plk{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.plk span b{color:var(--ink);font-weight:600}
+.plk span:first-child b{color:var(--gold)}
+.tile .l .lb{display:block;text-transform:none;letter-spacing:0;font-weight:500;color:var(--dim);margin-top:2px}
+.kv{display:grid;grid-template-columns:1fr auto;row-gap:7px;column-gap:12px;font-size:14px;color:#d5dfda;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.kv b{font-weight:600;color:var(--ink);text-align:right}
+.hist{list-style:none;margin:6px 0 0;padding:0}
+.hist li{display:grid;grid-template-columns:40px 1fr auto;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--felt-line);font-size:14px;font-variant-numeric:tabular-nums;color:#d5dfda}
+.hist li:first-child{border-top:0}
+.hist .pl{font-family:var(--f-idx);font-weight:700;font-size:17px;color:var(--muted)}
+.hist li.w .pl{color:var(--gold)}
+.hist .d{font-size:12px;color:var(--dim);display:block;margin-top:1px}
+.hist .pt{text-align:right;font-weight:600;color:var(--ink)}
+.hist .pt small{display:block;font-weight:400;font-size:12px;color:var(--dim)}
+.empty{color:var(--muted);font-size:14px;padding:12px 0 4px}
+#layer2 .scrim{z-index:14}
 #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
 .sheet.won h2{color:var(--gold);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
 .sheet.won .kicker{font-family:var(--f-idx);font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--lacquer);margin:0 0 2px;animation:pop .5s .05s cubic-bezier(.2,1.6,.4,1) both}
@@ -271,7 +305,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
     <button class="btn play" id="playBtn"><span id="playLbl">Play</span><i class="cdbar" id="cdbar" hidden></i></button>
   </div>
 </div>
-<div id="layer"></div>
+<div id="layer"></div><div id="layer2"></div>
 <canvas id="fx" aria-hidden="true"></canvas>
 
 <script>
@@ -427,8 +461,11 @@ const SND=(()=>{
 let S;
 function freshState(){
   return{hands:[[],[],[],[]],turn:0,top:null,passes:0,acts:[null,null,null,null],first:true,over:false,
-    scores:[0,0,0,0],wins:[0,0,0,0],sv:2,round:1,gameOver:null,sel:[],flash:null,result:null};
+    scores:[0,0,0,0],wins:[0,0,0,0],sv:2,round:1,gameOver:null,sel:[],flash:null,result:null,gid:uid(),handId:0};
 }
+/* ids let the stats record each hand and game exactly once, however often the page reloads on a result */
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+const handUid=()=>S.gid+':'+(S.handId||0);
 function deal(){
   stopCountdown();
   clearTimeout(botTimer);S.handId=(S.handId||0)+1;
@@ -533,6 +570,7 @@ function endHand(w){
   S.wins[w]++;
   S.result={w,delta,left:S.hands.map(h=>h.slice())};
   if(Math.max(...S.scores)>=GAME_TO) S.gameOver={winners:gameWinners()};
+  Stats.record();
   save();render();
   const g=S.gameOver,iWon=g?g.winners.includes(0):w===0;
   if(iWon){celebrate(!!g);SND.play(g?'bigwin':'win')}
@@ -754,6 +792,7 @@ function celebrate(big){
   fxParts.forEach((p,i)=>{if(p.x===0)p.vx=Math.abs(p.vx)+4;if(p.x===W)p.vx=-Math.abs(p.vx)-4});
   if(!fxRAF)fxRAF=requestAnimationFrame(fxStep);
 }
+function clearFx(){fxParts=[];const cv=$('fx');cv.getContext('2d').clearRect(0,0,cv.width,cv.height)}
 function fxStep(){
   const cv=$('fx'),ctx=cv.getContext('2d'),dpr=cv.width/innerWidth;
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);
@@ -772,12 +811,13 @@ function fxStep(){
 }
 
 /* ---------- sheets ---------- */
-function sheet(html,onMount,cls){
-  const L=$('layer');L.innerHTML=`<div class="scrim" id="scrim"><div class="sheet ${cls||''}" role="dialog">${html}</div></div>`;
-  $('scrim').addEventListener('click',e=>{if(e.target.id==='scrim'&&!S.over)closeSheet()});
+/* top: stack the sheet over the game-over screen (its own layer) instead of replacing it */
+function sheet(html,onMount,cls,top){
+  const L=$(top?'layer2':'layer');L.innerHTML=`<div class="scrim"><div class="sheet ${cls||''}" role="dialog">${html}</div></div>`;
+  L.firstChild.addEventListener('click',e=>{if(e.target===L.firstChild&&(top||!S.over))closeSheet()});
   onMount&&onMount();
 }
-function closeSheet(){$('layer').innerHTML=''}
+function closeSheet(){const L2=$('layer2');if(L2.innerHTML)L2.innerHTML='';else $('layer').innerHTML=''}
 function showResult(){
   const r=S.result;if(!r)return;
   if(S.gameOver){showGameOver();return}
@@ -798,16 +838,14 @@ function showGameOver(){
   const r=S.result,g=S.gameOver,W=g.winners,nm=i=>i===0?'You':NAMES[i];
   const iWon=W.includes(0);
   const list=a=>a.length>1?a.slice(0,-1).join(', ')+' & '+a[a.length-1]:a[0];
-  const order=[0,1,2,3].sort((a,b)=>S.scores[a]-S.scores[b]||S.wins[b]-S.wins[a]||a-b);
+  const {order,place}=standings();
   const ORD=['1st','2nd','3rd','4th'];
-  let place=0;
-  const rows=order.map((i,k)=>{
-    if(k>0){const p=order[k-1];if(S.scores[i]!==S.scores[p]||S.wins[i]!==S.wins[p])place=k}
-    return `<li class="${W.includes(i)?'first':''}${i===0?' me':''}"><span class="pl">${ORD[place]}</span><span class="nm">${nm(i)}</span>
-      <span class="hw">${S.wins[i]} hand${S.wins[i]===1?'':'s'} won</span><span class="pt">${S.scores[i]}</span></li>`}).join('');
+  const rows=order.map(i=>`<li class="${W.includes(i)?'first':''}${i===0?' me':''}"><span class="pl">${ORD[place[i]]}</span><span class="nm">${nm(i)}</span>
+      <span class="hw">${S.wins[i]} hand${S.wins[i]===1?'':'s'} won</span><span class="pt">${S.scores[i]}</span></li>`).join('');
   const over=list([0,1,2,3].filter(i=>S.scores[i]>=GAME_TO).map(nm));
   const title=W.length>1?list(W.map(nm))+' share the win':iWon?'You win the game!':NAMES[W[0]]+' wins the game';
-  const myPlace=ORD[order.indexOf(0)];
+  const myPlace=ORD[place[0]];
+  const st=Stats.get().games,streak=st.streak>=2?` · ${st.streak} in a row`:'';
   const trophy=`<svg class="trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 8h28v6h10v6c0 8-6 14-13 15-2 5-6 8-9 9v6h8v6H22v-6h8v-6c-3-1-7-4-9-9C14 34 8 28 8 20v-6h10zM14 20c0 4 2 7 5 8-1-3-1-6-1-8zm36 0h-4c0 2 0 5-1 8 3-1 5-4 5-8z"/></svg>`;
   $('layer').innerHTML=`<div class="gover${iWon?' won':''}" role="dialog" aria-label="Game over"><div class="go-in">
     ${iWon?trophy:''}
@@ -816,18 +854,21 @@ function showGameOver(){
     <p class="go-sub">${over} reached ${GAME_TO}. Lowest total wins${iWon?'':` · you finished ${myPlace}`}.</p>
     <ol class="stand">${rows}</ol>
     <p class="go-last">Last hand: ${r.w===0?'you went out':nm(r.w)+' went out'}${r.w===0?'':`, you took +${r.delta[0]}`}.</p>
+    ${st.played?(Stats.news.length?`<button class="go-rec pb" id="goRec">★ ${Stats.news[0]}</button>`:`<button class="go-rec" id="goRec">Record: ${recordLine()}${streak}</button>`):''}
     <button class="btn play" id="againBtn">Play again</button>
   </div></div>`;
   $('againBtn').onclick=()=>{closeSheet();S=freshState();deal();advance()};
+  const gr=$('goRec');if(gr)gr.onclick=()=>{clearFx();showStats(true)};
 }
 function showMenu(){
   sheet(`<h2>Big 2</h2><p class="sub">Hand ${S.round} · You have ${S.scores[0]} point${S.scores[0]===1?'':'s'}. First to ${GAME_TO} ends the game; lowest total wins.</p>
   <div class="menu-list">
+    <button class="btn" id="mStats">Your record<span class="mx">${recordLine()}</span></button>
     <button class="btn" id="mRules">How to play</button>
     <button class="btn danger" id="mNew">New game (reset scores)</button>
     <button class="btn" id="mClose">Back to table</button>
   </div>`,()=>{
-    $('mRules').onclick=showRules;$('mClose').onclick=closeSheet;
+    $('mRules').onclick=showRules;$('mClose').onclick=closeSheet;$('mStats').onclick=()=>showStats(false);
     $('mNew').onclick=()=>{sheet(`<h2>Start over?</h2><p class="sub">This deals a new hand and resets everyone's score to 0.</p>
       <div class="row2"><button class="btn" id="cNo">Cancel</button><button class="btn play" id="cYes">New game</button></div>`,()=>{
         $('cNo').onclick=closeSheet;$('cYes').onclick=()=>{closeSheet();S=freshState();deal();advance()}})};
@@ -850,7 +891,7 @@ function showRules(){
   <h3>Flushes</h3>
   <p>Compare the highest cards first, then the next highest, and so on. Suit only decides when every rank matches. So A-7-5-4-3 beats K-Q-J-10-8.</p>
   <h3>Controls</h3>
-  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>If a play can't be beaten by any card still in play (like 2♠ as a single), the trick ends right away</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the bar on the Next trick button runs down for 3 seconds and then the next trick starts. Tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. Sound follows your volume buttons, even with the silent switch on</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li></ul>
+  <ul><li>Tap cards to select, or drag across several</li><li>On your turn, cards that can't be part of any legal play are dimmed</li><li>If nothing in your hand beats the table, you pass automatically</li><li>If a play can't be beaten by any card still in play (like 2♠ as a single), the trick ends right away</li><li>When following, tapping a card also picks the cards that have to go with it. Tapping a card that can't join your current pick starts a new pick</li><li>After a trick ends, the bar on the Next trick button runs down for 3 seconds and then the next trick starts. Tap Next trick (or the table) to go now. If you won the trick, tapping a card in your hand also starts it. Leaving the page stops the countdown</li><li>On the opening lead, 3♦ is selected for you and stays selected</li><li>The speaker button at the top turns sounds on or off. Sound follows your volume buttons, even with the silent switch on</li><li>Cards in a suit you hold 5 or more of are marked, so flushes are easy to spot</li><li>Your record (in the menu) counts every finished hand and game on this device. Starting a new game doesn't clear it</li></ul>
   <div style="height:12px"></div><button class="btn" id="rBack">Done</button>`,()=>{$('rBack').onclick=closeSheet});
 }
 
@@ -938,19 +979,114 @@ function validSave(s){
 }
 function snap(){return{S:JSON.parse(JSON.stringify(S))}}
 
+/* ---------- record: lifetime stats, separate from the game save so they survive New game ---------- */
+/* final standings: order by points, then hands won; place index per player (ties share a place) */
+function standings(){
+  const order=[0,1,2,3].sort((a,b)=>S.scores[a]-S.scores[b]||S.wins[b]-S.wins[a]||a-b);
+  const place=[0,0,0,0];let p=0;
+  order.forEach((i,k)=>{if(k>0){const q=order[k-1];if(S.scores[i]!==S.scores[q]||S.wins[i]!==S.wins[q])p=k}place[i]=p});
+  return{order,place};
+}
+const Stats=(()=>{
+  const KEY='big2-stats',V=1,KEEP=20;
+  const fresh=()=>({v:V,games:{played:0,won:0,shared:0,places:[0,0,0,0],streak:0,best:0,low:null,pts:0,oppWins:[0,0,0,0]},
+    hands:{played:0,won:0,pts:0},recent:[],seen:{hand:'',game:''}});
+  const isN=x=>Number.isInteger(x)&&x>=0;
+  const isA=(a,n)=>Array.isArray(a)&&a.length===n&&a.every(isN);
+  function valid(d){
+    if(!d||typeof d!=='object'||d.v!==V)return false;
+    const g=d.games,h=d.hands;
+    if(!g||!h||!isN(g.played)||!isN(g.won)||!isN(g.shared)||!isA(g.places,4)||!isN(g.streak)||!isN(g.best)||!(g.low===null||isN(g.low))||!isN(g.pts)||!isA(g.oppWins,4))return false;
+    if(!isN(h.played)||!isN(h.won)||!isN(h.pts))return false;
+    if(!Array.isArray(d.recent)||!d.recent.every(r=>r&&isN(r.t)&&isN(r.hands)&&isN(r.place)&&isA(r.scores,4)&&isA(r.hw,4)&&Array.isArray(r.w)))return false;
+    if(!d.seen||typeof d.seen.hand!=='string'||typeof d.seen.game!=='string')return false;
+    return true;
+  }
+  let D=null,ok=true,news=[]; // news: personal bests from the game that just ended (this session only) // ok: storage works; when it doesn't, stats live for this session only
+  function get(){if(D)return D;try{const d=JSON.parse(localStorage.getItem(KEY));if(valid(d))D=d}catch(_){}return D||(D=fresh())}
+  function put(){try{localStorage.setItem(KEY,JSON.stringify(D));ok=true}catch(_){ok=false}}
+  /* called from endHand and again on reload of a finished hand: the ids make it a no-op the second time */
+  function record(){
+    const r=S.result;if(!r)return;
+    const d=get();let dirty=false;
+    const hid=handUid();
+    if(d.seen.hand!==hid){
+      d.seen.hand=hid;d.hands.played++;if(r.w===0)d.hands.won++;d.hands.pts+=r.delta[0];
+      dirty=true;
+    }
+    if(S.gameOver&&d.seen.game!==S.gid){
+      d.seen.game=S.gid;const g=d.games,W=S.gameOver.winners,{place}=standings(),iWon=W.includes(0);
+      const pBest=g.best,pLow=g.low,pWon=g.won;
+      g.played++;g.places[place[0]]++;g.pts+=S.scores[0];
+      if(iWon){g.won++;if(W.length>1)g.shared++;g.streak++;g.best=Math.max(g.best,g.streak)}else g.streak=0;
+      if(g.low===null||S.scores[0]<g.low)g.low=S.scores[0];
+      W.forEach(i=>{if(i)g.oppWins[i]++});
+      news=[];
+      if(iWon&&pWon===0)news.push('First win!');
+      if(iWon&&g.streak>=2&&g.streak>pBest)news.push(`New best streak: <b>${g.streak}</b> in a row`);
+      if(pLow!==null&&S.scores[0]<pLow)news.push(`Your lowest score yet: <b>${S.scores[0]}</b>`);
+      d.recent.unshift({t:Date.now(),hands:S.round,place:place[0],scores:S.scores.slice(),hw:S.wins.slice(),w:W.slice()});
+      d.recent.length=Math.min(d.recent.length,KEEP);
+      dirty=true;
+    }
+    if(dirty)put();
+  }
+  function reset(){D=fresh();news=[];put()}
+  return{get,record,reset,get ok(){return ok},get news(){return news}};
+})();
+function showStats(top){
+  const d=Stats.get(),g=d.games,h=d.hands;
+  const pct=(a,b)=>b?Math.round(100*a/b)+'%':'–';
+  const ORD=['1st','2nd','3rd','4th'];
+  const nm=i=>i===0?'You':NAMES[i];
+  const list=a=>a.length>1?a.slice(0,-1).join(', ')+' & '+a[a.length-1]:a[0];
+  const day=t=>{const x=new Date(t),n=new Date();return x.toLocaleDateString(undefined,x.getFullYear()===n.getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'})};
+  let body;
+  if(!g.played&&!h.played) body=`<p class="empty">No games yet. Your record starts with the first hand you finish.</p>`;
+  else{
+    const sk=`<div class="tile${g.streak>=2?' hi':''}"><div class="v">${g.streak}</div><div class="l">Win streak · best ${g.best}</div></div>`;
+    const bars=g.places.map(n=>`<i style="width:${g.played?100*n/g.played:0}%"></i>`).join('');
+    const key=g.places.map((n,i)=>`<span>${ORD[i]} <b>${n}</b></span>`).join('');
+    const nem=(()=>{const m=Math.max(...g.oppWins);if(!m)return null;const who=[1,2,3].filter(i=>g.oppWins[i]===m);return list(who.map(nm))+' · '+m+' win'+(m===1?'':'s')})();
+    body=`<div class="tiles">
+      ${g.played?`<div class="tile${g.won&&g.won*2>=g.played?' hi':''}"><div class="v">${g.won}<small>of ${g.played}</small></div><div class="l">Games won · ${pct(g.won,g.played)}</div></div>
+      ${sk}`:''}
+      <div class="tile"><div class="v">${h.won}<small>of ${h.played}</small></div><div class="l">Hands won · ${pct(h.won,h.played)}</div></div>
+      <div class="tile"><div class="v">${h.played?(h.pts/h.played).toFixed(1):'–'}</div><div class="l">Avg points taken<span class="lb">lower is better</span></div></div>
+    </div>
+    ${g.played?`<h3>Finishes</h3><div class="places">${bars}</div><div class="plk">${key}</div>`:''}
+    <h3>Details</h3><div class="kv">
+      <span>Lowest final score</span><b>${g.low===null?'–':g.low}</b>
+      ${nem?`<span>Toughest opponent</span><b>${nem}</b>`:''}
+    </div>
+    ${d.recent.length?`<h3>Recent games</h3><ul class="hist">${d.recent.slice(0,5).map(r=>{const w=r.w.includes(0);
+      return `<li class="${w?'w':''}"><span class="pl">${ORD[r.place]}</span><span>${w?(r.w.length>1?'Shared with '+list(r.w.filter(i=>i).map(nm)):'You won'):nm(r.w[0])+' won'}<span class="d">${day(r.t)} · ${r.hands} hand${r.hands===1?'':'s'}</span></span><span class="pt">${r.scores[0]} pts<small>${r.hw[0]} hand${r.hw[0]===1?'':'s'} won</small></span></li>`}).join('')}</ul>`:''}
+    <div style="height:14px"></div><button class="btn danger" id="sReset">Reset record</button>`;
+  }
+  sheet(`<h2>Your record</h2><p class="sub">${Stats.ok?'Kept on this device.':'Storage is unavailable, so this is just the current session.'}</p>${body}
+    <div style="height:8px"></div><button class="btn" id="sBack">Done</button>`,()=>{
+    $('sBack').onclick=closeSheet;
+    const rb=$('sReset');if(rb)rb.onclick=()=>sheet(`<h2>Reset your record?</h2><p class="sub">This clears every game and hand on this device. The current game keeps going.</p>
+      <div class="row2"><button class="btn" id="cNo">Cancel</button><button class="btn play" id="cYes">Reset</button></div>`,()=>{
+        $('cNo').onclick=()=>showStats(top);$('cYes').onclick=()=>{Stats.reset();showStats(top)}},'',top);
+  },'',top);
+}
+const recordLine=()=>{const g=Stats.get().games;return g.played?`<b>${g.won}</b> of <b>${g.played}</b> won`:''};
+
 function start(data){
   S=(data&&validSave(data.S)&&data.S)||load();
   if(!S){S=freshState();deal()}
   if(S.sv!==2){S.scores=[0,0,0,0];S.wins=[0,0,0,0];S.sv=2;S.gameOver=null}
   if(S.top&&S.top.co) S.top.co=classify(S.top.co.cards);
+  if(typeof S.gid!=='string')S.gid=uid();
   if(!S.over&&S.top&&S.passes>=3){S.flash={who:S.top.by};S.turn=-1}else S.flash=null;
-  if(S.over){render();showResult()}else advance();
+  if(S.over){Stats.record();render();showResult()}else advance();
 }
 window.claude?.hot?.snapshot?.(snap);
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 
 /* test hooks */
-window.__big2={canBeatFrom,celebrate,SND,cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
+window.__big2={Stats,showStats,standings,canBeatFrom,celebrate,SND,cardHTML,nextTrick,smartSelect,classify,allPlays,beats,describe,get S(){return S},set S(v){S=v},deal,doPlay,doPass,botMove,legal,hintList,render,freshState};
 })();
 </script>
 
